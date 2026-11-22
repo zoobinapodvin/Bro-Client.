@@ -1,9 +1,9 @@
 import {spawnSync} from 'node:child_process';
-for(const script of ['app.js','connexion.js','api/platform.js','lib/fulfillment.mjs','lib/discord.mjs','lib/purchase-notify.mjs','lib/activity.mjs']){
+for(const script of ['app.js','connexion.js','api/platform.js','lib/fulfillment.mjs','lib/discord.mjs','lib/purchase-notify.mjs','lib/activity.mjs','lib/checkout.mjs']){
   const check=spawnSync(process.execPath,['--check',script],{stdio:'inherit'});
   if(check.status!==0)throw Error('JavaScript syntax check failed: '+script);
 }
-const checks=spawnSync(process.execPath,['--test','tests/bro-checkout-roles.test.mjs','tests/discord-oauth-route.test.mjs','tests/secure-portal.test.mjs','tests/activity-ui.test.mjs'],{stdio:'inherit'});
+const checks=spawnSync(process.execPath,['--test','tests/bro-checkout-roles.test.mjs','tests/discord-oauth-route.test.mjs','tests/secure-portal.test.mjs','tests/activity-ui.test.mjs','tests/checkout-guest.test.mjs'],{stdio:'inherit'});
 if(checks.status!==0)throw Error('Bro Client checks failed. Deployment stopped.');
 import {cp,mkdir} from 'node:fs/promises';
 await mkdir('dist',{recursive:true});
