@@ -5,6 +5,7 @@ import {createCheckout,handleBilling,hasConfirmedPurchase} from '../lib/billing.
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
 import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
+import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary} from '../lib/activity.mjs';
 const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET};
 async function body(req,max) {
   const chunks=[];let size=0;
@@ -40,6 +41,10 @@ export default async function handler(req,res) {
       res.setHeader('Cache-Control','public, s-maxage=120, stale-while-revalidate=300');
       return res.json(counts);
     }
+    if(path==='/api/activity'&&req.method==='GET'){
+      res.setHeader('Cache-Control','public, s-maxage=10, stale-while-revalidate=20');
+      return res.json({purchases:await recentPurchases(bucket)});
+    }
     if(path==='/api/site'&&req.method==='GET'){
       const {site:config,revision}=await site();return res.json({...config,revision});
     }
@@ -64,7 +69,28 @@ export default async function handler(req,res) {
       res.setHeader('Content-Type',img.httpMetadata.contentType);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.end(Buffer.from(await new Response(img.body).arrayBuffer()));
     }
     const user=isWebhook?null:await session(req,res);
-    if(path==='/api/me'&&req.method==='GET')return res.json({user:user?{email:user.email,admin:user.admin,discordLinked:!!user.discordId}:null});
+    if(path==='/api/me'&&req.method==='GET')return res.json({user:user?{
+      discordUsername:user.discordUsername,
+      discordAvatar:user.discordAvatar,
+      admin:user.admin,discordLinked:!!user.discordId
+    }:null});
+    if(path==='/api/account/publicity'){
+      if(!user?.discordId)return res.status(401).end();
+      if(req.method==='GET')return res.json({showPublic:await getActivityPreference(bucket,user.discordId)});
+      if(req.method==='POST'){
+        const choice=JSON.parse(payload.toString());
+        if(typeof choice?.showPublic!=='boolean')return res.status(422).end();
+        return res.json(await setActivityPreference(bucket,user,choice.showPublic));
+      }
+      return res.status(405).end();
+    }
+    if(path==='/api/admin/activity/backfill'&&req.method==='POST'){
+      if(!user?.admin)return res.status(403).end();
+      if(!billingEnv.WHOP_API_KEY)return res.status(503).json({error:'Connecte la clé API Whop dans Vercel.'});
+      const result=await backfillWhopHistory(bucket,{apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID});
+      if(result.imported>0)result.discordSummary=await sendHistoricalSummary(bucket,result);
+      return res.json(result);
+    }
     if(path==='/api/account/overview'&&req.method==='GET'){
       if(!user)return res.status(401).json({error:'Connecte-toi avec Discord.'});
       return res.json(await accountOverview(bucket,user));
@@ -142,7 +168,7 @@ export default async function handler(req,res) {
       if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
       const paymentsReady=!!(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID&&billingEnv.WHOP_WEBHOOK_SECRET);
       if(!user&&paymentsReady)return res.redirect(302,'/auth/login?return_to='+encodeURIComponent(path));
-      return res.redirect(302,user ? await createCheckout(billingEnv,user.id,user.discordId,plan,origin) : plan.checkoutUrl);
+      return res.redirect(302,user ? await createCheckout(billingEnv,user,plan,origin) : plan.checkoutUrl);
     }
     return res.status(404).end();
   } catch(e){if(e instanceof RangeError)return res.status(413).end();if(e instanceof SyntaxError)return res.status(400).end();console.error('Bro Client request failed',path,e.name);return res.status(503).json({error:'Service momentanément indisponible.'});}
