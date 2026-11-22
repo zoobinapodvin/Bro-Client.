@@ -37,7 +37,7 @@ test('checkout UI and explanatory text require Discord',()=>{
  const src=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
  const site=readFileSync(new URL('../offres.html',import.meta.url),'utf8');
  assert.match(src,/if\(!user\?\.discordId\)/);
- assert.match(src,/await createCheckout\(billingEnv,user,plan,origin\)/);
+ assert.match(src,/return res\.redirect\(302,target\.href\)/);
  assert.match(site,/Connexion Discord requise/);
  assert.match(config.content.a3,/Oui\. Connecte-toi avec Discord/);
 });
