@@ -1,6 +1,6 @@
 import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
-import {session,credentials,clear,destination} from '../lib/auth.mjs';
+import {session,exchange,startDiscord,clear,destination} from '../lib/auth.mjs';
 import {createCheckout,handleBilling} from '../lib/billing.mjs';
 const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET};
 async function body(req,max) {
@@ -30,7 +30,9 @@ export default async function handler(req,res) {
     if(path==='/auth/login'&&req.method==='GET')return res.redirect(302,'/connexion.html?return_to='+encodeURIComponent(destination(parsed.searchParams.get('return_to'))));
     if(path==='/auth/logout'&&req.method==='GET'){clear(res);return res.redirect(303,'/');}
     const payload=req.method==='POST'?await body(req,path==='/api/media'?4*1024*1024:isWebhook?250000:100000):undefined;
-    if(['/auth/session','/auth/register','/auth/recover','/auth/exchange','/auth/password'].includes(path)&&req.method==='POST')return await credentials(req,res,path.split('/').pop(),JSON.parse(payload.toString()));
+    if(path==='/auth/discord'&&req.method==='POST')return startDiscord(res);
+    if(path==='/auth/exchange'&&req.method==='POST')return await exchange(req,res,JSON.parse(payload.toString()));
+
     if(/^\/media\/[a-f0-9-]{36}$/.test(path)&&req.method==='GET'){
       const img=await bucket.get(route);if(!img)return res.status(404).end();
       res.setHeader('Content-Type',img.httpMetadata.contentType);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.end(Buffer.from(await new Response(img.body).arrayBuffer()));

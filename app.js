@@ -40,10 +40,10 @@ function render(){
   $('#plans')?.replaceChildren(...site.plans.map(plan=>{
     const card=block('article',undefined,'plan '+plan.id);
     const row=block('div',undefined,'plan-top');
-    const frame=block('div',{day:'J',week:'S',month:'M',life:'∞'}[plan.id],'item');frame.setAttribute('aria-hidden','true');row.append(frame);
-    if(plan.id==='life')row.append(block('span',c.lifetimeBadge,'badge'));
+    row.setAttribute('aria-hidden','true');
+    row.append(block('span','BRO.','pass-mark'),block('span',plan.duration,'pass-duration'));
     const price=block('div',undefined,'amount');
-    price.append(block('strong',new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(plan.price)+' €'),block('small','/ '+plan.duration));
+    price.append(block('strong',new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(plan.price)+' €'),block('small','paiement unique'));
     card.append(row,block('h3',plan.name),block('p',plan.description),price,button(c.planButton,()=>checkout(plan),'btn plan-button')); return card;
   }));
   $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');el.append(block('summary',c['q'+i]),block('p',c['a'+i]));return el;}));
@@ -186,9 +186,9 @@ const gallery=$('.gallery-strip');
 if(gallery){
  const slides=[['launcher','Le launcher'],['visuals','Affichage en jeu'],['settings','Interface de réglages'],['appearance','Options du joueur']];
  for(const [file,label] of slides){
-   const src='/assets/preview-'+file+'.webp';
+   const src='/assets/full-'+file+'.webp';
    const select=button(label,()=>{
-     $('#preview').src=src;$('#preview').alt=label+' — capture de Bro Client';$('#caption').textContent=label;$('#full-preview').href=src;
+     $('#preview').src=src;$('#preview').alt=label+' — capture de Bro Client';$('#caption').textContent=label;$('#full-preview').href=src;$('#zoom').href=src;
      for(const item of gallery.children)item.setAttribute('aria-pressed',String(item===select));
    },'preview-tab');
    select.setAttribute('aria-pressed',String(file==='launcher'));gallery.append(select);
