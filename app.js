@@ -59,62 +59,190 @@ function checkout(plan) {
   body.append(block('p','Le paiement de cette offre est en attente de son lien Whop.'),block('p',plan.price+' € · '+plan.duration));
   body.append(button('Revenir aux offres',()=>modal.close()));
 }
-function account(){
-  openDialog(site?.content.accountLabel||'Espace client');
-  if(!accountReady){body.append(block('p','Impossible de récupérer ta session.'));body.append(button('Réessayer',async()=>{await loadUser();account();}));return;}
+// Brand icon comes from the public Discord mark, used only in first-party UI.
+const discordMark='<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.078.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.078-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.045-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.027c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.095.252-.194.372-.293a.075.075 0 0 1 .078-.01c3.928 1.794 8.18 1.794 12.06 0a.075.075 0 0 1 .079.01c.12.099.246.198.373.293a.077.077 0 0 1-.007.127c-.6.35-1.226.652-1.873.893a.077.077 0 0 0-.041.107c.36.698.773 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.876 19.876 0 0 0 6.002-3.03.077.077 0 0 0 .032-.057c.5-5.177-.838-9.673-3.548-13.66a.061.061 0 0 0-.031-.028zM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.42 2.157-2.42 1.21 0 2.176 1.095 2.157 2.42 0 1.334-.955 2.419-2.157 2.419zm7.974 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.42 2.157-2.42 1.21 0 2.176 1.095 2.157 2.42 0 1.334-.955 2.419-2.157 2.419z"/></svg>';
+function discordButton(text,href,cls='btn discord-connect'){
+  const el=link(text,href,cls);
+  const icon=block('span',undefined,'discord-brand-icon');icon.innerHTML=discordMark;
+  el.prepend(icon);return el;
+}
+async function account(){
+  openDialog('Espace client');
+  modal.classList.add('client-portal');
+  body.classList.add('client-portal-body');
+  const hero=block('div',undefined,'client-hero');
+  const eyebrow=block('span','BRO CLIENT / ESPACE PRIVÉ','client-eyebrow');
+  const info=block('div',undefined,'client-hero-copy');
+  info.append(eyebrow,block('h3',user?'Bienvenue dans ton espace.':'Un espace, tous tes accès.'));
+  const desc=block('p',user?'Achats, téléchargements et accès Discord réunis au même endroit.':'Connecte Discord pour retrouver tes services et tes achats vérifiés.');
+  info.append(desc);hero.append(info);
+  body.append(hero);
+  if(!accountReady){
+    body.append(block('p','Connexion à ton espace indisponible.','client-note'),button('Réessayer',async()=>{await loadUser();account();},'btn ghost'));return;
+  }
   if(!user){
-    body.append(block('p','Connecte-toi pour consulter tes achats et retrouver tes factures.'));
-    const area=block('div',undefined,'modal-actions');area.append(link('Se connecter','/auth/login?return_to=/%23compte','btn cyan'));body.append(area);return;
+    const loginCard=block('section',undefined,'client-signin');
+    loginCard.append(block('h3','Connexion sécurisée avec Discord'),block('p','Aucun mot de passe Bro Client à créer. La connexion passe par Discord et Supabase.'));
+    loginCard.append(discordButton('Continuer avec Discord','/auth/discord'));
+    body.append(loginCard);return;
   }
-  body.append(block('p',user.email,'account-email'));
-  const invoices=block('section',undefined,'account-block');const results=block('div');
-  const portal=link('Ouvrir mes achats sur Whop','https://whop.com/@me/settings/orders/');portal.target='_blank';portal.rel='noopener noreferrer';
-  invoices.append(block('h3','Mes factures'),results,portal);body.append(invoices);
-  loadInvoices(results);
-  const section=block('section',undefined,'account-block');section.append(block('h3','Mes guides'),button('Consulter les guides',()=>guides(false)));body.append(section);
-  const discord=block('section',undefined,'account-block');
-  const help=block('p','Ton compte Discord est utilisé pour vérifier tes achats et ton rôle sur le serveur Bro Client.','notice');
-  const feedback=block('p','','notice');feedback.setAttribute('role','status');
-  discord.append(block('h3','Discord et rôle client'),help,feedback);
-  const discordActions=block('div',undefined,'modal-actions');
-  const sync=button('Synchroniser mon rôle Discord',async()=>{
-    sync.disabled=true;feedback.textContent='Vérification de ton achat et de ton rôle…';
-    try {
-      const res=await fetch('/api/discord/sync',{method:'POST'});
-      const result=await res.json();
-      if(!res.ok)throw Error(result.error||'Erreur de synchronisation.');
+  const identity=block('div',undefined,'client-identity');
+  const identityIcon=block('span',undefined,'discord-brand-icon');identityIcon.innerHTML=discordMark;
+  const who=block('div',undefined,'client-who');
+  who.append(block('strong','Discord connecté'),block('small',user.email||'Compte associé','account-email'));
+  identity.append(identityIcon,who,block('span','Session active','client-online-badge'));
+  body.append(identity);
+
+  const actions=block('div',undefined,'client-toolbar');
+  const refresh=button('Actualiser mes achats',()=>updateOverview(true),'btn client-button-primary');
+  const sync=button('Synchroniser mon rôle',async()=>{
+    sync.disabled=true;notice.textContent='Synchronisation Discord en cours…';
+    try{
+      const response=await fetch('/api/discord/sync',{method:'POST'});
+      const result=await response.json();
       const labels={
-        role_granted:'Rôle Customer activé sur ton compte Discord.',
-        role_granted_lifetime:'Rôles Customer et Lifetime activés sur ton compte Discord.',
-        role_expired:'Ton pass est expiré ; le rôle a été retiré.',
-        no_purchase:'Aucun achat vérifié associé à ton compte Discord. Les achats invités ne peuvent pas être reconnus automatiquement.',
-        bot_unconfigured:'L’installation du bot Discord n’est pas encore terminée.',
-        not_member:'Tu dois rejoindre le serveur Discord Bro Client avant de synchroniser ton rôle.',
-        insufficient_permissions:'Le bot doit être placé au-dessus du rôle Client et disposer de la permission Gérer les rôles.',
-        discord_unavailable:'Discord ne répond pas. Réessaie plus tard.',
-        identity_missing:'Impossible de retrouver ton identifiant Discord. Reconnecte-toi.'
+        role_granted:'Ton rôle Customer est synchronisé.',
+        role_granted_lifetime:'Tes rôles Customer et Lifetime sont synchronisés.',
+        no_purchase:'Aucun achat Discord vérifié pour le moment.',
+        bot_unconfigured:'Le bot attend ses identifiants de configuration.',
+        not_member:'Rejoins le serveur Discord avant de synchroniser ton rôle.',
+        discord_unavailable:'Discord est momentanément indisponible.',
+        insufficient_permissions:'Le bot doit disposer du droit Gérer les rôles.'
       };
-      feedback.textContent=labels[result.status]||'Synchronisation indisponible.';
-    }catch(error){feedback.textContent=error.message;}
+      notice.textContent=labels[result.status]||result.error||'Synchronisation indisponible.';
+    }catch{notice.textContent='Synchronisation momentanément indisponible.';}
     finally{sync.disabled=false;}
-  },'btn cyan');
-  discordActions.append(sync);
-  const invite=link('Rejoindre le Discord','https://discord.gg/uRQyKBhhgA','btn ghost');invite.target='_blank';invite.rel='noopener noreferrer';
-  discordActions.append(invite);
+  },'btn ghost');
+  actions.append(refresh,sync);
+  body.append(actions);
+  const notice=block('p','','client-feedback');notice.setAttribute('role','status');body.append(notice);
+  const grid=block('div',undefined,'client-grid');
+  const purchases=block('section',undefined,'client-tile client-purchases');
+  purchases.append(block('span','01 / ACHATS','client-kicker'),block('h3','Mes achats'),block('p','Retrouve les passes associés à ton compte Discord.','client-subtitle'));
+  const purchaseBody=block('div',undefined,'client-purchase-results');
+  purchases.append(purchaseBody);
+  const delivery=block('section',undefined,'client-tile client-delivery');
+  delivery.append(block('span','02 / TÉLÉCHARGEMENTS','client-kicker'),block('h3','Mon Bro Client'));
+  const deliveryBody=block('div',undefined,'client-delivery-results');
+  delivery.append(deliveryBody);
+  grid.append(purchases,delivery);
+
+  const keyTile=block('section',undefined,'client-tile client-key-tile');
+  keyTile.append(block('span','03 / ACTIVATION','client-kicker'),block('h3','Clé d’activation'));
+  const keyBody=block('div',undefined,'client-key-results');
+  keyTile.append(keyBody);
+  const resources=block('section',undefined,'client-tile client-resources');
+  resources.append(block('span','04 / RESSOURCES','client-kicker'),block('h3','Centre d’aide'));
+  resources.append(block('p','Consulte les guides et contacte le support officiel si nécessaire.','client-subtitle'));
+  resources.append(button('Consulter les guides',()=>guides(false),'btn ghost'));
+  const guild=discordButton('Rejoindre le serveur','https://discord.gg/uRQyKBhhgA','btn client-discord-link');
+  guild.target='_blank';guild.rel='noopener noreferrer';
+  resources.append(guild);
+  grid.append(keyTile,resources);
+  body.append(grid);
+
+  const receipts=block('details',undefined,'client-receipts');
+  const receiptTitle=block('summary','Factures et historique Whop');
+  const receiptList=block('div');
+  receipts.append(receiptTitle,receiptList);
+  const portal=link('Consulter les achats sur Whop','https://whop.com/@me/settings/orders/');
+  portal.target='_blank';portal.rel='noopener noreferrer';receipts.append(portal);
+  receipts.addEventListener('toggle',()=>{if(receipts.open&&!receiptList.childElementCount)loadInvoices(receiptList);});
+  body.append(receipts);
   if(user.admin){
-    discordActions.append(button('Installer les commandes /bro',async()=>{
-      feedback.textContent='Enregistrement des commandes…';
-      try {
-        const response=await fetch('/api/discord/register',{method:'POST'});
+    const admin=block('section',undefined,'client-admin');
+    admin.append(block('h3','Administration Bro Client'),block('p','Importer la version exacte du programme validé, enregistrer les commandes et administrer le site.'));
+    const row=block('div',undefined,'client-admin-actions');
+    row.append(button('Administrer le site',editor,'btn ghost'),button('Gérer les guides',()=>guides(true),'btn ghost'));
+    const register=button('Installer /bro et /startkey',async()=>{
+      register.disabled=true;notice.textContent='Enregistrement des commandes Discord…';
+      try{
+        const result=await(await fetch('/api/discord/register',{method:'POST'})).json();
+        notice.textContent=result.status==='registered'?'Commandes installées dans Discord.':'La configuration du bot doit être terminée.';
+      }catch{notice.textContent='Impossible d’installer les commandes actuellement.';}
+      finally{register.disabled=false;}
+    },'btn ghost');
+    row.append(register);
+    const upload=block('input');upload.type='file';upload.accept='.exe,application/octet-stream';upload.setAttribute('aria-label','Importer la version de BroClient.exe');
+    const publish=button('Importer BroClient.exe',async()=>{
+      const file=upload.files?.[0];if(!file){notice.textContent='Sélectionne le fichier BroClient.exe.';return;}
+      publish.disabled=true;notice.textContent='Vérification et transfert privé du fichier…';
+      try{
+        const response=await fetch('/api/admin/release',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:file});
         const result=await response.json();
-        feedback.textContent=result.status==='registered'?'Commandes Discord /bro installées.':'Complète d’abord la configuration du bot.';
-      } catch {feedback.textContent='L’enregistrement des commandes a échoué.';}
-    },'btn ghost'));
+        if(!response.ok||result.status!=='stored')throw Error('Fichier différent de la version autorisée, ou stockage indisponible.');
+        notice.textContent='BroClient.exe enregistré dans le stockage privé.';
+        await updateOverview(false);
+      }catch(error){notice.textContent=error.message;}
+      finally{publish.disabled=false;}
+    },'btn client-button-primary');
+    admin.append(row,upload,publish);body.append(admin);
   }
-  discord.append(discordActions);body.append(discord);
-  const area=block('div',undefined,'modal-actions');
-  if(user.admin)area.append(button('Administrer le site',editor,'btn cyan'),button('Gérer les guides',()=>guides(true)));
-  area.append(link('Se déconnecter','/auth/logout','btn ghost'));body.append(area);
+  const footer=block('div',undefined,'client-footer');
+  footer.append(block('span','Ton compte reste associé à tes achats après déconnexion.','client-footer-note'));
+  const disconnect=button('Déconnecter Discord',async()=>{
+    disconnect.disabled=true;
+    try{
+      const response=await fetch('/auth/unlink',{method:'POST'});
+      if(!response.ok)throw Error();
+      user=null;account();
+    }catch{notice.textContent='Impossible de déconnecter la session. Réessaie.';disconnect.disabled=false;}
+  },'btn client-disconnect');
+  const miniIcon=block('span',undefined,'discord-brand-icon');miniIcon.innerHTML=discordMark;
+  disconnect.prepend(miniIcon);footer.append(disconnect);body.append(footer);
+
+  async function updateOverview(manual){
+    refresh.disabled=true;
+    if(manual)notice.textContent='Actualisation des achats vérifiés…';
+    try{
+      const response=await fetch('/api/account/overview',{cache:'no-store'});
+      const data=await response.json();
+      if(!response.ok)throw Error(data.error||'Service indisponible.');
+      purchaseBody.replaceChildren();
+      deliveryBody.replaceChildren();
+      keyBody.replaceChildren();
+      if(data.purchases?.length){
+        for(const purchase of data.purchases){
+          const row=block('div',undefined,'client-pass');
+          const labels={day:'Pass Jour',week:'Pass Semaine',month:'Pass Mois',life:'Pass Lifetime'};
+          const name=block('strong',labels[purchase.planId]||'Pass Bro Client');
+          const active=block('span',purchase.active?'Actif':'Expiré',purchase.active?'client-tag-active':'client-tag-expired');
+          row.append(name,active);
+          if(purchase.expiresAt&&purchase.active)row.append(block('small','Jusqu’au '+new Date(purchase.expiresAt).toLocaleDateString('fr-FR')));
+          purchaseBody.append(row);
+        }
+      }else purchaseBody.append(block('p','Aucun achat associé à ce compte pour le moment.','client-muted'));
+      if(!data.whopConfigured)purchaseBody.append(block('p','Synchronisation automatique Whop en attente de configuration.','client-muted'));
+      if(data.active){
+        if(data.downloadAvailable){
+          const download=link('Télécharger BroClient.exe','/api/account/download','btn client-button-primary');
+          download.setAttribute('download','BroClient.exe');deliveryBody.append(download);
+        }else deliveryBody.append(block('p','Le programme sera disponible dans ton espace après sa publication.','client-muted'));
+        if(data.keyAvailable){
+          const copy=button('Copier ma clé',async()=>{
+            try{
+              const response=await fetch('/api/account/key',{cache:'no-store'});
+              if(!response.ok)throw Error();
+              const {key}=await response.json();
+              await navigator.clipboard.writeText(key);
+              notice.textContent='Clé copiée dans le presse-papiers.';
+            }catch{notice.textContent='La copie a échoué. Utilise le téléchargement texte.';}
+          },'btn client-button-primary');
+          const txt=link('Télécharger la clé (.txt)','/api/account/key.txt','btn ghost');
+          keyBody.append(copy,txt);
+        }else{
+          keyBody.append(block('p','Tu as déjà acheté ? Ouvre un ticket support pour récupérer ta clé.','client-muted'));
+          const support=discordButton('Contacter le support','https://discord.gg/uRQyKBhhgA','btn ghost');
+          support.target='_blank';support.rel='noopener noreferrer';keyBody.append(support);
+        }
+      }else deliveryBody.append(block('p','Disponible après la confirmation d’un achat actif.','client-muted'));
+      if(manual)notice.textContent='Achats vérifiés actualisés. Les achats effectués sans connexion Discord nécessitent une vérification par le support.';
+    }catch(error){
+      purchaseBody.replaceChildren(block('p','Impossible de consulter les achats pour le moment.','client-muted'));
+      notice.textContent=error.message;
+    }finally{refresh.disabled=false;}
+  }
+  updateOverview(false);
 }
 async function loadInvoices(target,cursor) {
   const note=block('p','Chargement des paiements…');target.append(note);
