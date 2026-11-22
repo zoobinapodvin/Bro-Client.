@@ -79,7 +79,7 @@ async function checkout(plan) {
   welcome.append(block('span','BRO CLIENT · CONNEXION SÉCURISÉE','client-kicker'),
     block('h3','Ton pass, lié à ton compte Discord.'),
     block('p','Connecte-toi avec Discord pour associer ton achat à ton espace client et permettre la synchronisation de ton rôle.'));
-  welcome.append(discordButton('Continuer avec Discord','/auth/discord?return_to='+encodeURIComponent('/checkout/'+plan.id)));
+  welcome.append(discordButton('Continuer avec Discord','/auth/discord?return_to='+encodeURIComponent('/offres')));
   body.append(welcome);
 }
 // Brand icon comes from the public Discord mark, used only in first-party UI.
