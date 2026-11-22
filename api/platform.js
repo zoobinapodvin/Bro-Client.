@@ -1,6 +1,6 @@
 import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
-import {session,exchange,startDiscord,clear,destination} from '../lib/auth.mjs';
+import {session,exchange,startDiscord,clear,disconnectDiscord,destination} from '../lib/auth.mjs';
 import {createCheckout,handleBilling,hasConfirmedPurchase} from '../lib/billing.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
@@ -55,6 +55,7 @@ export default async function handler(req,res) {
       if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();
       return res.json(await reconcileExpiredRoles(bucket));
     }
+    if(path==='/auth/unlink'&&req.method==='POST')return disconnectDiscord(req,res);
     if(path==='/auth/discord'&&req.method==='POST')return startDiscord(res,new URLSearchParams(payload.toString()).get('return_to'));
     if(path==='/auth/exchange'&&req.method==='POST')return await exchange(req,res,JSON.parse(payload.toString()));
 
