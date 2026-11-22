@@ -1,0 +1,29 @@
+name: Security checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  repo-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Prevent committed binaries and credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          tracked="$(git ls-files '*.exe' '*.msi' '.env' '.env.*' '*.p12' '*.pem' || true)"
+          if [ -n "$tracked" ]; then
+            echo "::error::Executable or secret-bearing files are tracked in this repository."
+            exit 1
+          fi
+          # Search committed files for directly usable credential strings.
+          if git grep -nEI 'discord[.]com/api/webhooks/[0-9]{17,20}/[[:alnum:]_-]{20,}|sb_secret_[[:alnum:]_-]{20,}' -- . ':!.github/workflows/security.yml'; then
+            echo "::error::Secret-like credentials detected in tracked files."
+            exit 1
+          fi
+          echo "Secret and binary hygiene checks passed."
