@@ -25,7 +25,14 @@ export default async function handler(req,res) {
   try {
     const isWebhook=path==='/api/whop/webhook';
     const isInteraction=path==='/api/discord/interactions';
-    if(req.method==='POST'&&!isWebhook&&!isInteraction&&req.headers.origin!==origin)return res.status(403).end();
+    const isDiscordStart=path==='/auth/discord';
+    // OAuth can begin via a standard top-level GET. Allow the previous POST form
+    // temporarily for browsers that still have an older, cached connexion.html.
+    // Other mutations remain protected by an exact same-origin POST check.
+    const trustedLoginOrigin=['https://www.broclient.com','https://broclient.com'].includes(req.headers.origin);
+    if(req.method==='POST'&&!isWebhook&&!isInteraction &&
+       !(isDiscordStart&&trustedLoginOrigin) && req.headers.origin!==origin)
+      return res.status(403).json({error:'Origine de la requête non autorisée.'});
     const site=()=>readSite(bucket);
     if(path==='/api/discord/community'&&req.method==='GET'){
       const counts=await communityStats();
@@ -36,6 +43,8 @@ export default async function handler(req,res) {
       const {site:config,revision}=await site();return res.json({...config,revision});
     }
     if(path==='/auth/login'&&req.method==='GET')return res.redirect(302,'/connexion.html?return_to='+encodeURIComponent(destination(parsed.searchParams.get('return_to'))));
+    if(isDiscordStart&&req.method==='GET')
+      return startDiscord(res,parsed.searchParams.get('return_to'));
     if(path==='/auth/logout'&&req.method==='GET'){clear(res);return res.redirect(303,'/');}
     const payload=req.method==='POST'?await body(req,path==='/api/media'?4*1024*1024:isWebhook?250000:100000):undefined;
     if(isInteraction&&req.method==='POST')return handleInteraction(req,res,payload,bucket);
