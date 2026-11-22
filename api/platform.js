@@ -4,6 +4,7 @@ import {session,exchange,startDiscord,clear,destination} from '../lib/auth.mjs';
 import {createCheckout,handleBilling,hasConfirmedPurchase} from '../lib/billing.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
+import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
 const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET};
 async function body(req,max) {
   const chunks=[];let size=0;
@@ -46,7 +47,8 @@ export default async function handler(req,res) {
     if(isDiscordStart&&req.method==='GET')
       return startDiscord(res,parsed.searchParams.get('return_to'));
     if(path==='/auth/logout'&&req.method==='GET'){clear(res);return res.redirect(303,'/');}
-    const payload=req.method==='POST'?await body(req,path==='/api/media'?4*1024*1024:isWebhook?250000:100000):undefined;
+    const payload=req.method==='POST'?await body(req,
+      path==='/api/admin/release'?4*1024*1024:path==='/api/media'?4*1024*1024:isWebhook?250000:100000):undefined;
     if(isInteraction&&req.method==='POST')return handleInteraction(req,res,payload,bucket);
     if(path==='/api/discord/cron'&&req.method==='GET'){
       const secret=process.env.CRON_SECRET;
@@ -62,6 +64,39 @@ export default async function handler(req,res) {
     }
     const user=isWebhook?null:await session(req,res);
     if(path==='/api/me'&&req.method==='GET')return res.json({user:user?{email:user.email,admin:user.admin,discordLinked:!!user.discordId}:null});
+    if(path==='/api/account/overview'&&req.method==='GET'){
+      if(!user)return res.status(401).json({error:'Connecte-toi avec Discord.'});
+      return res.json(await accountOverview(bucket,user));
+    }
+    if(path==='/api/account/key'&&req.method==='GET'){
+      if(!user?.discordId)return res.status(401).end();
+      const key=await readCustomerKey(bucket,user.discordId);
+      return key?res.json({key}):res.status(404).json({error:'Clé indisponible.'});
+    }
+    if(path==='/api/account/key.txt'&&req.method==='GET'){
+      if(!user?.discordId)return res.status(401).end();
+      const key=await readCustomerKey(bucket,user.discordId);
+      if(!key)return res.status(404).end();
+      res.setHeader('Content-Type','text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition','attachment; filename="BroClient-key.txt"');
+      return res.end('BRO CLIENT — Clé privée\\r\\n'+key+'\\r\\n');
+    }
+    if(path==='/api/account/download'&&req.method==='GET'){
+      if(!user?.discordId)return res.status(401).end();
+      if(!await hasActivePurchase(bucket,user.discordId))return res.status(403).end();
+      const file=await bucket.get(RELEASE_PATH);
+      if(!file)return res.status(404).json({error:'Le programme sera bientôt disponible.'});
+      res.setHeader('Content-Type','application/octet-stream');
+      res.setHeader('Content-Disposition','attachment; filename="BroClient.exe"');
+      res.setHeader('X-Content-Type-Options','nosniff');
+      for await(const chunk of file.body)res.write(chunk);
+      return res.end();
+    }
+    if(path==='/api/admin/release'&&req.method==='POST'){
+      if(!user?.admin||!user.discordId)return res.status(403).end();
+      const result=await storeRelease(bucket,payload);
+      return res.status(result.status==='stored'?201:422).json(result);
+    }
     if(path==='/api/discord/status'&&req.method==='GET'){
       if(!user)return res.status(401).end();
       return res.json({botConfigured:botConfigured(),discordLinked:!!user.discordId,paymentsConfigured:!!(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID&&billingEnv.WHOP_WEBHOOK_SECRET)});
