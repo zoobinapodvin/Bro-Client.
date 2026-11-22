@@ -72,6 +72,45 @@ function account(){
   invoices.append(block('h3','Mes factures'),results,portal);body.append(invoices);
   loadInvoices(results);
   const section=block('section',undefined,'account-block');section.append(block('h3','Mes guides'),button('Consulter les guides',()=>guides(false)));body.append(section);
+  const discord=block('section',undefined,'account-block');
+  const help=block('p','Ton compte Discord est utilisé pour vérifier tes achats et ton rôle sur le serveur Bro Client.','notice');
+  const feedback=block('p','','notice');feedback.setAttribute('role','status');
+  discord.append(block('h3','Discord et rôle client'),help,feedback);
+  const discordActions=block('div',undefined,'modal-actions');
+  const sync=button('Synchroniser mon rôle Discord',async()=>{
+    sync.disabled=true;feedback.textContent='Vérification de ton achat et de ton rôle…';
+    try {
+      const res=await fetch('/api/discord/sync',{method:'POST'});
+      const result=await res.json();
+      if(!res.ok)throw Error(result.error||'Erreur de synchronisation.');
+      const labels={
+        role_granted:'Rôle client activé sur ton compte Discord.',
+        role_expired:'Ton pass est expiré ; le rôle a été retiré.',
+        no_purchase:'Aucun achat vérifié associé à ton compte Discord. Les achats invités ne peuvent pas être reconnus automatiquement.',
+        bot_unconfigured:'L’installation du bot Discord n’est pas encore terminée.',
+        not_member:'Tu dois rejoindre le serveur Discord Bro Client avant de synchroniser ton rôle.',
+        insufficient_permissions:'Le bot doit être placé au-dessus du rôle Client et disposer de la permission Gérer les rôles.',
+        discord_unavailable:'Discord ne répond pas. Réessaie plus tard.',
+        identity_missing:'Impossible de retrouver ton identifiant Discord. Reconnecte-toi.'
+      };
+      feedback.textContent=labels[result.status]||'Synchronisation indisponible.';
+    }catch(error){feedback.textContent=error.message;}
+    finally{sync.disabled=false;}
+  },'btn cyan');
+  discordActions.append(sync);
+  const invite=link('Rejoindre le Discord','https://discord.gg/uRQyKBhhgA','btn ghost');invite.target='_blank';invite.rel='noopener noreferrer';
+  discordActions.append(invite);
+  if(user.admin){
+    discordActions.append(button('Installer les commandes /bro',async()=>{
+      feedback.textContent='Enregistrement des commandes…';
+      try {
+        const response=await fetch('/api/discord/register',{method:'POST'});
+        const result=await response.json();
+        feedback.textContent=result.status==='registered'?'Commandes Discord /bro installées.':'Complète d’abord la configuration du bot.';
+      } catch {feedback.textContent='L’enregistrement des commandes a échoué.';}
+    },'btn ghost'));
+  }
+  discord.append(discordActions);body.append(discord);
   const area=block('div',undefined,'modal-actions');
   if(user.admin)area.append(button('Administrer le site',editor,'btn cyan'),button('Gérer les guides',()=>guides(true)));
   area.append(link('Se déconnecter','/auth/logout','btn ghost'));body.append(area);

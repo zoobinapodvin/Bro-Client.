@@ -22,5 +22,11 @@
       "source": "/media/:id",
       "destination": "/api/platform?route=media/:id"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/discord/cron",
+      "schedule": "0 * * * *"
+    }
   ]
 }

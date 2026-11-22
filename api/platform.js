@@ -1,7 +1,8 @@
 import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
 import {session,exchange,startDiscord,clear,destination} from '../lib/auth.mjs';
-import {createCheckout,handleBilling} from '../lib/billing.mjs';
+import {createCheckout,handleBilling,hasConfirmedPurchase} from '../lib/billing.mjs';
+import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET};
 async function body(req,max) {
   const chunks=[];let size=0;
@@ -22,7 +23,8 @@ export default async function handler(req,res) {
   const path='/'+route;
   try {
     const isWebhook=path==='/api/whop/webhook';
-    if(req.method==='POST'&&!isWebhook&&req.headers.origin!==origin)return res.status(403).end();
+    const isInteraction=path==='/api/discord/interactions';
+    if(req.method==='POST'&&!isWebhook&&!isInteraction&&req.headers.origin!==origin)return res.status(403).end();
     const site=()=>readSite(bucket);
     if(path==='/api/site'&&req.method==='GET'){
       const {site:config,revision}=await site();return res.json({...config,revision});
@@ -30,7 +32,13 @@ export default async function handler(req,res) {
     if(path==='/auth/login'&&req.method==='GET')return res.redirect(302,'/connexion.html?return_to='+encodeURIComponent(destination(parsed.searchParams.get('return_to'))));
     if(path==='/auth/logout'&&req.method==='GET'){clear(res);return res.redirect(303,'/');}
     const payload=req.method==='POST'?await body(req,path==='/api/media'?4*1024*1024:isWebhook?250000:100000):undefined;
-    if(path==='/auth/discord'&&req.method==='POST')return startDiscord(res);
+    if(isInteraction&&req.method==='POST')return handleInteraction(req,res,payload,bucket);
+    if(path==='/api/discord/cron'&&req.method==='GET'){
+      const secret=process.env.CRON_SECRET;
+      if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();
+      return res.json(await reconcileExpiredRoles(bucket));
+    }
+    if(path==='/auth/discord'&&req.method==='POST')return startDiscord(res,new URLSearchParams(payload.toString()).get('return_to'));
     if(path==='/auth/exchange'&&req.method==='POST')return await exchange(req,res,JSON.parse(payload.toString()));
 
     if(/^\/media\/[a-f0-9-]{36}$/.test(path)&&req.method==='GET'){
@@ -38,7 +46,20 @@ export default async function handler(req,res) {
       res.setHeader('Content-Type',img.httpMetadata.contentType);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.end(Buffer.from(await new Response(img.body).arrayBuffer()));
     }
     const user=isWebhook?null:await session(req,res);
-    if(path==='/api/me'&&req.method==='GET')return res.json({user:user?{email:user.email,admin:user.admin}:null});
+    if(path==='/api/me'&&req.method==='GET')return res.json({user:user?{email:user.email,admin:user.admin,discordLinked:!!user.discordId}:null});
+    if(path==='/api/discord/status'&&req.method==='GET'){
+      if(!user)return res.status(401).end();
+      return res.json({botConfigured:botConfigured(),discordLinked:!!user.discordId,paymentsConfigured:!!(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID&&billingEnv.WHOP_WEBHOOK_SECRET)});
+    }
+    if(path==='/api/discord/sync'&&req.method==='POST'){
+      if(!user)return res.status(401).json({error:'Connexion Discord requise.'});
+      if(!user.discordId)return res.status(422).json({status:'identity_missing'});
+      return res.json(await reconcileMember(bucket,user.discordId));
+    }
+    if(path==='/api/discord/register'&&req.method==='POST'){
+      if(!user?.admin)return res.status(403).end();
+      return res.json(await registerCommands());
+    }
     if(path==='/api/guides'){
       if(!user)return res.status(401).json({error:'Connexion requise.'});
       const key='guides/catalogue.json';
@@ -68,7 +89,9 @@ export default async function handler(req,res) {
       
       const {site:config}=await site();const plan=config.plans.find(p=>path==='/checkout/'+p.id);
       if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
-      return res.redirect(302,user ? await createCheckout(billingEnv,user.id,plan,origin) : plan.checkoutUrl);
+      const paymentsReady=!!(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID&&billingEnv.WHOP_WEBHOOK_SECRET);
+      if(!user&&paymentsReady&&botConfigured())return res.redirect(302,'/auth/login?return_to='+encodeURIComponent(path));
+      return res.redirect(302,user ? await createCheckout(billingEnv,user.id,user.discordId,plan,origin) : plan.checkoutUrl);
     }
     return res.status(404).end();
   } catch(e){if(e instanceof RangeError)return res.status(413).end();if(e instanceof SyntaxError)return res.status(400).end();console.error('Bro Client request failed',path,e.name);return res.status(503).json({error:'Service momentanément indisponible.'});}
