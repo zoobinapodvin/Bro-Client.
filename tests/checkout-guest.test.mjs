@@ -36,8 +36,8 @@ test('invalid or off-domain checkout links cannot be injected',async()=>{
 test('checkout UI and explanatory text require Discord',()=>{
  const src=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
  const site=readFileSync(new URL('../offres.html',import.meta.url),'utf8');
- assert.match(src,/checkoutDestination\(billingEnv,user,plan,origin,createCheckout\)/);
- assert.doesNotMatch(src,/if\(!user&&paymentsReady\)/);
+ assert.match(src,/if\(!user\?\.discordId\)/);
+ assert.match(src,/await createCheckout\(billingEnv,user,plan,origin\)/);
  assert.match(site,/Connexion Discord requise/);
- assert.match(config.content.a3,/Non\. Tu peux acheter directement/);
+ assert.match(config.content.a3,/Oui\. Connecte-toi avec Discord/);
 });
