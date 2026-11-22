@@ -2,7 +2,6 @@ import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
 import {session,exchange,startDiscord,clear,disconnectDiscord,destination} from '../lib/auth.mjs';
 import {createCheckout,handleBilling,hasConfirmedPurchase} from '../lib/billing.mjs';
-import {checkoutDestination} from '../lib/checkout.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
 import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
@@ -167,7 +166,15 @@ export default async function handler(req,res) {
       
       const {site:config}=await site();const plan=config.plans.find(p=>path==='/checkout/'+p.id);
       if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
-      return res.redirect(302,await checkoutDestination(billingEnv,user,plan,origin,createCheckout));
+      // A paid checkout must have a verified Discord session. Never fall back
+      // to an anonymous Whop plan: that would silently break account linking.
+      if(!user?.discordId)return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent(path));
+      try{
+        return res.redirect(302,await createCheckout(billingEnv,user,plan,origin));
+      }catch(error){
+        console.error('Discord-attributed checkout unavailable',plan.id,error?.name);
+        return res.status(503).json({error:'Le paiement lié à Discord est temporairement indisponible. Réessaie dans quelques instants.'});
+      }
     }
     return res.status(404).end();
   } catch(e){if(e instanceof RangeError)return res.status(413).end();if(e instanceof SyntaxError)return res.status(400).end();console.error('Bro Client request failed',path,e.name);return res.status(503).json({error:'Service momentanément indisponible.'});}

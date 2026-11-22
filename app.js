@@ -53,11 +53,34 @@ function openDialog(title) {
   const heading=block('h2',title);heading.id='dialogTitle';body.append(heading);modal.setAttribute('aria-labelledby','dialogTitle');
   if(!modal.open)modal.showModal();modal.scrollTop=0;
 }
-function checkout(plan) {
-  if(plan.checkoutUrl){location.assign('/checkout/'+plan.id);return;}
-  openDialog(plan.name);
-  body.append(block('p','Le paiement de cette offre est en attente de son lien Whop.'),block('p',plan.price+' € · '+plan.duration));
-  body.append(button('Revenir aux offres',()=>modal.close()));
+async function checkout(plan) {
+  if(!plan.checkoutUrl){
+    openDialog(plan.name);
+    body.append(block('p','Le paiement de cette offre est en attente de son lien Whop.'),block('p',plan.price+' € · '+plan.duration));
+    body.append(button('Revenir aux offres',()=>modal.close()));
+    return;
+  }
+  // Always refresh the server-backed session before starting a purchase.
+  await loadUser();
+  if(!accountReady){
+    openDialog('Connexion indisponible');
+    body.append(block('p','Impossible de vérifier ta session Discord pour le moment. Réessaie avant de payer.'));
+    body.append(button('Réessayer',()=>checkout(plan),'btn client-button-primary'));
+    return;
+  }
+  if(user?.discordLinked){
+    location.assign('/checkout/'+plan.id);
+    return;
+  }
+  openDialog('Connecte-toi pour commander');
+  modal.classList.add('client-portal','client-portal-compact');
+  body.classList.add('client-portal-body');
+  const welcome=block('section',undefined,'portal-welcome');
+  welcome.append(block('span','BRO CLIENT · CONNEXION SÉCURISÉE','client-kicker'),
+    block('h3','Ton pass, lié à ton compte Discord.'),
+    block('p','Connecte-toi avec Discord pour associer ton achat à ton espace client et permettre la synchronisation de ton rôle.'));
+  welcome.append(discordButton('Continuer avec Discord','/auth/discord?return_to='+encodeURIComponent('/checkout/'+plan.id)));
+  body.append(welcome);
 }
 // Brand icon comes from the public Discord mark, used only in first-party UI.
 const discordMark='<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.078.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.078-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.045-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.027c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.095.252-.194.372-.293a.075.075 0 0 1 .078-.01c3.928 1.794 8.18 1.794 12.06 0a.075.075 0 0 1 .079.01c.12.099.246.198.373.293a.077.077 0 0 1-.007.127c-.6.35-1.226.652-1.873.893a.077.077 0 0 0-.041.107c.36.698.773 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.876 19.876 0 0 0 6.002-3.03.077.077 0 0 0 .032-.057c.5-5.177-.838-9.673-3.548-13.66a.061.061 0 0 0-.031-.028zM8.02 15.331c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.42 2.157-2.42 1.21 0 2.176 1.095 2.157 2.42 0 1.334-.955 2.419-2.157 2.419zm7.974 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.42 2.157-2.42 1.21 0 2.176 1.095 2.157 2.42 0 1.334-.955 2.419-2.157 2.419z"/></svg>';

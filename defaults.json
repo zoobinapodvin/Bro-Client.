@@ -33,7 +33,7 @@
     "q2": "Où retrouver mes factures ?",
     "a2": "Ouvre ton espace client, puis la rubrique Factures. Connecte-toi à Whop avec le compte utilisé pour ton achat et sélectionne le paiement concerné.",
     "q3": "Faut-il un compte pour acheter ?",
-    "a3": "Non. Tu peux acheter directement sur Whop, sans connexion Discord. Pour associer automatiquement un achat à ton espace Bro Client, connecte-toi avant de commander (fonctionnalité disponible lorsque la synchronisation est active).",
+    "a3": "Oui. Connecte-toi avec Discord pour associer ton achat à ton espace Bro Client. Si tu es déjà connecté, tu accèdes directement au paiement.",
     "planButton": "Obtenir mon pass",
     "lifetimeBadge": "LIFETIME",
     "footer": "Bro Client · Boutique officielle",
