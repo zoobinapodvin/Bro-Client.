@@ -432,3 +432,56 @@ if(discordCounter){
   refreshDiscordCounter();
   setInterval(()=>{if(document.visibilityState==='visible')refreshDiscordCounter();},120000);
 }
+
+
+/* Homepage: last five verified payments, updated every 15 seconds; no fictitious sales. */
+const recentBoard=document.getElementById('purchaseBoard');
+let lastFeedSignature='';
+async function refreshRecentBoard(){
+  if(!recentBoard)return;
+  try{
+    const response=await fetch('/api/activity',{cache:'no-store'});
+    if(!response.ok)throw Error('feed_unavailable');
+    const data=await response.json();
+    if(!Array.isArray(data.purchases))throw Error('bad_feed');
+    const signature=JSON.stringify(data.purchases);
+    if(signature===lastFeedSignature)return;
+    lastFeedSignature=signature;
+    recentBoard.replaceChildren();
+    if(!data.purchases.length){
+      recentBoard.append(block('p','Les prochains achats confirmés apparaîtront ici.','purchase-board-empty'));
+      return;
+    }
+    const money=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'});
+    for(const purchase of data.purchases.slice(0,5)){
+      if(!Number.isFinite(purchase.amount)||!Number.isFinite(Date.parse(purchase.date)))continue;
+      const row=block('div',undefined,'purchase-board-item');
+      const buyer=block('div',undefined,'purchase-board-buyer');
+      const photo=block('span',undefined,'purchase-board-photo');
+      if(purchase.avatar){
+        const img=block('img');img.src=purchase.avatar;img.alt='';
+        img.loading='lazy';img.referrerPolicy='no-referrer';
+        img.onerror=()=>{img.replaceWith(block('span','B'));};
+        photo.append(img);
+      }else photo.append(block('span','B'));
+      const name=block('div',undefined,'purchase-board-name');
+      name.append(block('strong',purchase.name||'Client BRO'),block('small','Achat confirmé'));
+      buyer.append(photo,name);
+      const item=block('span',purchase.plan||'Bro Client','purchase-board-plan');
+      const paid=block('strong',money.format(purchase.amount),'purchase-board-amount');
+      const time=block('time',new Date(purchase.date).toLocaleString('fr-FR',{
+        timeZone:'Europe/Paris',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'
+      }),'purchase-board-date');
+      time.dateTime=purchase.date;
+      row.append(buyer,item,paid,time);
+      recentBoard.append(row);
+    }
+  }catch{
+    if(!recentBoard.childElementCount||recentBoard.textContent.includes('Chargement'))
+      recentBoard.replaceChildren(block('p','Les achats récents sont momentanément indisponibles.','purchase-board-empty'));
+  }
+}
+if(recentBoard){
+  refreshRecentBoard();
+  setInterval(()=>{if(document.visibilityState==='visible')refreshRecentBoard();},15000);
+}
