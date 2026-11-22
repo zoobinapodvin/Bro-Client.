@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {normalizeCounts} from '../lib/community.mjs';
 import defaults from '../defaults.json' with {type:'json'};
 import {entitlement,reconcileMember,expiryForPlan} from '../lib/discord.mjs';
 
@@ -63,4 +65,20 @@ test('verified lifetime gets both Customer and Lifetime roles',async t=>{
  assert.equal(actions[1].method,'PUT');
  assert.ok(actions[0].url.endsWith('/roles/'+customer));
  assert.ok(actions[1].url.endsWith('/roles/'+lifetime));
+});
+
+test('Discord community counts use the actual Bro Client guild only',()=>{
+ assert.deepEqual(normalizeCounts({guild:{id:'1448897452404117558'},approximate_member_count:210,approximate_presence_count:47}),{members:210,online:47});
+ assert.equal(normalizeCounts({guild:{id:'123456789012345678'},approximate_member_count:5000,approximate_presence_count:500}),null);
+ assert.equal(normalizeCounts({guild:{id:'1448897452404117558'},approximate_member_count:'210',approximate_presence_count:47}),null);
+});
+test('both public navigation headers include the linked Discord counter',()=>{
+ for(const page of ['index.html','offres.html']){
+  const html=readFileSync(new URL('../'+page,import.meta.url),'utf8');
+  assert.ok(html.includes('data-discord-community'));
+  assert.ok(html.includes('data-discord-online'));
+  assert.ok(html.includes('data-discord-total'));
+  assert.ok(html.includes('https://discord.gg/uRQyKBhhgA'));
+  assert.ok(html.indexOf('data-discord-community')<html.indexOf('<nav aria-label="Navigation principale">'));
+ }
 });
