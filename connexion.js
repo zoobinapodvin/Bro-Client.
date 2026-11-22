@@ -21,6 +21,6 @@ if(code){
       const result=await res.json();
       if(!res.ok)throw Error(result.error||'Connexion indisponible.');
       location.replace(result.redirect||'/#compte');
-    }catch(error){message.textContent=error.message;submit.disabled=false;}
+    }catch(error){document.documentElement.classList.remove('oauth-callback');message.textContent=error.message;submit.disabled=false;}
   })();
 }
