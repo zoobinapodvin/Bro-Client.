@@ -87,3 +87,92 @@ header{box-shadow:0 1px 0 #b4c8e009}
 .discord-live-unit small{font-size:.58rem}.bar .account{margin-left:auto}}
 @media(max-width:440px){.bar{gap:8px}.bar .account{display:none}.discord-live{padding:7px 8px}}
 @media(prefers-reduced-motion:reduce){.discord-live{transition:none}.discord-live:hover{transform:none}}
+
+
+/* 2026 client portal — bespoke BRO steel-blue dashboard */
+#modal.client-portal{width:min(94vw,820px);padding:0;border:1px solid #435775;border-radius:20px;
+ background:linear-gradient(165deg,#1c2532 0%,#131b26 60%,#111720 100%);
+ box-shadow:0 35px 115px #000c,inset 0 1px #ffffff12;max-height:min(92dvh,950px)}
+#modal.client-portal .modal-top{padding:18px 25px;margin:0;border-bottom:1px solid #ffffff14;background:#1b263480;
+ backdrop-filter:blur(12px);position:sticky;top:0;z-index:2}
+#modal.client-portal .modal-top img{width:83px;max-height:37px;object-fit:contain}
+#modal.client-portal .client-portal-body{padding:22px 27px 28px}
+#modal.client-portal #dialogTitle{font-size:clamp(21px,3vw,27px);line-height:1.1;font-weight:850;margin:2px 0 18px;letter-spacing:-.045em}
+.client-hero{padding:25px 27px 24px;background:
+ radial-gradient(ellipse at 92% 20%,#6f99c425 0,transparent 50%),
+ linear-gradient(130deg,#243448,#1b2736);border:1px solid #425875;border-radius:14px}
+.client-eyebrow,.client-kicker{font:800 .67rem/1.5 "Courier New",monospace;letter-spacing:.15em;color:#a5c7ee}
+.client-hero h3{font-size:clamp(24px,3.8vw,34px);line-height:1.04;letter-spacing:-.058em;margin:10px 0}
+.client-hero p{font-size:.9rem;line-height:1.6;margin:0;color:#c1d0e1}
+.client-signin{padding:25px;border:1px solid #384c64;border-radius:14px;margin-top:16px;
+ display:flex;align-items:flex-start;flex-direction:column;gap:14px;background:#1c2736}
+.client-signin h3{font-size:1.16rem;margin:0}
+.client-signin p{font-size:.9rem;line-height:1.5;margin:0;color:#b6c3d5}
+.discord-brand-icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.discord-brand-icon svg{width:19px;height:19px;display:block}
+.discord-connect{background:#5865f2;border-color:#6572ff;color:white;min-width:230px}
+.discord-connect:hover{background:#4756df;border-color:#8c96ff}
+.client-identity{display:flex;align-items:center;gap:12px;padding:15px 18px;background:#141e2b;border:1px solid #364963;
+ border-radius:12px;margin-top:15px}
+.client-identity>.discord-brand-icon{width:41px;height:41px;border-radius:12px;background:#5865f2;color:white}
+.client-identity>.discord-brand-icon svg{width:23px;height:23px}
+.client-who{display:flex;flex-direction:column;gap:4px;min-width:0}
+.client-who strong{font-size:.93rem}.client-who small{color:#abbfd7;overflow-wrap:anywhere;font-size:.8rem}
+.client-online-badge{margin-left:auto;color:#8de0b7;background:#173a34;border:1px solid #28624b;
+ white-space:nowrap;padding:5px 9px;border-radius:20px;font-size:.7rem;font-weight:800}
+.client-toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 0}
+.client-button-primary{background:#c4d7ed;color:#182333;border:1px solid #c4d7ed}
+.client-button-primary:hover{background:#e1edf9;border-color:#e1edf9}
+.client-toolbar .btn{font-size:.85rem;min-height:42px}
+.client-feedback{font-size:.83rem!important;min-height:8px;color:#9fc4eb!important;margin:9px 2px!important}
+.client-feedback:empty{height:0;min-height:0;margin:0!important}
+.client-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.client-tile{background:linear-gradient(155deg,#1d2937,#17212d);border:1px solid #35485e;border-radius:13px;
+ padding:19px;min-height:146px;min-width:0}
+.client-tile h3{font-size:1.16rem!important;letter-spacing:-.04em;margin:7px 0 9px!important}
+.client-tile p{margin:4px 0 10px!important}
+.client-tile .btn{font-size:.82rem;margin:5px 7px 0 0;min-height:38px}
+.client-subtitle,.client-muted{color:#afbdcf!important;font-size:.85rem!important;line-height:1.5!important}
+.client-pass{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0;border-top:1px solid #ffffff15}
+.client-pass:first-child{border-top:none}.client-pass strong{font-size:.89rem}
+.client-pass small{font-size:.75rem;color:#a5b4c8;width:100%}
+.client-tag-active,.client-tag-expired{padding:4px 8px;border-radius:7px;font-size:.72rem;font-weight:750;margin-left:auto}
+.client-tag-active{color:#a2eccb;background:#173a31;border:1px solid #2a614b}
+.client-tag-expired{color:#c5c5c5;background:#333;border:1px solid #555}
+.client-key-tile,.client-delivery{background:linear-gradient(142deg,#233449,#1a2736)}
+.client-discord-link{display:inline-flex;background:#26365b;border:1px solid #4d5c93;color:#dfe5ff}
+.client-discord-link:hover{background:#354872}
+.client-receipts{border:1px solid #364b65;border-radius:11px;margin-top:14px;padding:14px 17px;background:#172331}
+.client-receipts summary{cursor:pointer;font-size:.91rem;font-weight:750}
+.client-receipts>div{margin-top:13px}.client-receipts>a{display:inline-block;margin-top:12px;color:#b8d6f7;text-decoration:underline}
+.client-admin{margin-top:14px;padding:18px;border:1px dashed #6980a0;border-radius:12px;background:#1b2737}
+.client-admin h3{margin:0 0 8px!important}.client-admin>p{font-size:.83rem;color:#b5c5d8}
+.client-admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.client-admin input[type=file]{display:block;max-width:100%;font-size:.83rem;margin:10px 0;color:#e2e9f1}
+.client-footer{margin-top:18px;border-top:1px solid #ffffff15;padding:16px 0 0;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.client-footer-note{font-size:.75rem;color:#92a8c2;max-width:56%}
+.client-disconnect{background:#192332;border-color:#485872;color:#b3c4e5;font-size:.83rem}
+.client-disconnect:hover{border-color:#7e95b2;background:#233044}
+.client-signin .discord-brand-icon,.client-disconnect .discord-brand-icon{color:white}
+.client-note{color:#adc1d9}
+@media(max-width:720px){
+ #modal.client-portal{width:min(96vw,600px);max-height:92dvh;border-radius:16px}
+ #modal.client-portal .modal-top{padding:14px 17px}
+ #modal.client-portal .client-portal-body{padding:17px 16px 23px}
+ .client-hero{padding:19px 18px}
+ .client-grid{grid-template-columns:1fr;gap:10px}
+ .client-tile{padding:16px;min-height:0}
+ .client-identity{padding:12px;gap:10px}
+ .client-online-badge{font-size:.65rem;padding:4px 6px}
+ .client-toolbar .btn{flex:1 1 160px}
+ .client-footer{align-items:stretch;flex-direction:column}
+ .client-footer-note{max-width:none}
+ .client-disconnect{align-self:flex-start}
+}
+@media(max-width:400px){
+ .client-toolbar .btn{flex:1 1 100%}
+ .client-identity>.discord-brand-icon{width:35px;height:35px}
+ .client-identity .account-email{font-size:.72rem}
+ #modal.client-portal .modal-top img{width:68px}
+}
+@media(prefers-reduced-motion:reduce){.client-portal *{scroll-behavior:auto!important}}
