@@ -1,5 +1,5 @@
 import {spawnSync} from 'node:child_process';
-const checks=spawnSync(process.execPath,['--test','tests/bro-checkout-roles.test.mjs'],{stdio:'inherit'});
+const checks=spawnSync(process.execPath,['--test','tests/bro-checkout-roles.test.mjs','tests/discord-oauth-route.test.mjs'],{stdio:'inherit'});
 if(checks.status!==0)throw Error('Bro Client checks failed. Deployment stopped.');
 import {cp,mkdir} from 'node:fs/promises';
 await mkdir('dist',{recursive:true});
