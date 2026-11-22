@@ -2,6 +2,7 @@ import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
 import {session,exchange,startDiscord,clear,disconnectDiscord,destination} from '../lib/auth.mjs';
 import {createCheckout,handleBilling,hasConfirmedPurchase} from '../lib/billing.mjs';
+import {checkoutDestination} from '../lib/checkout.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
 import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
@@ -166,16 +167,7 @@ export default async function handler(req,res) {
       
       const {site:config}=await site();const plan=config.plans.find(p=>path==='/checkout/'+p.id);
       if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
-      // Guest checkout is always permitted. Whop remains the payment authority.
-      // An authenticated buyer gets an attributed checkout when supported by Whop;
-      // an API failure must never prevent access to the official existing checkout.
-      if(!user)return res.redirect(302,plan.checkoutUrl);
-      try {
-        return res.redirect(302,await createCheckout(billingEnv,user,plan,origin));
-      } catch(error) {
-        console.error('Attributed checkout failed; using official Whop checkout',plan.id,error?.name);
-        return res.redirect(302,plan.checkoutUrl);
-      }
+      return res.redirect(302,await checkoutDestination(billingEnv,user,plan,origin,createCheckout));
     }
     return res.status(404).end();
   } catch(e){if(e instanceof RangeError)return res.status(413).end();if(e instanceof SyntaxError)return res.status(400).end();console.error('Bro Client request failed',path,e.name);return res.status(503).json({error:'Service momentanément indisponible.'});}
