@@ -42,6 +42,20 @@ export default async function handler(req,res) {
       return res.json(counts);
     }
     if(path==='/api/activity'&&req.method==='GET'){
+      // Direct Whop checkout links do not carry a Bro order reference. Import
+      // verified company payments for the public feed, without granting roles
+      // or guessing Discord identities. Throttle upstream reads per deployment.
+      const marker='private/activity/whop-feed-refresh.json';
+      const previous=await bucket.get(marker);
+      const last=previous?await previous.json().catch(()=>null):null;
+      if(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID&&
+         (!last?.at||Date.now()-Date.parse(last.at)>120000)){
+        try{
+          await backfillWhopHistory(bucket,{apiKey:billingEnv.WHOP_API_KEY,
+            accountId:billingEnv.WHOP_ACCOUNT_ID,maxPages:2});
+          await bucket.put(marker,JSON.stringify({at:new Date().toISOString()}));
+        }catch(error){console.error('Whop activity refresh failed',error?.message);}
+      }
       res.setHeader('Cache-Control','public, s-maxage=10, stale-while-revalidate=20');
       return res.json({purchases:await recentPurchases(bucket)});
     }
