@@ -169,12 +169,15 @@ export default async function handler(req,res) {
       // A paid checkout must have a verified Discord session. Never fall back
       // to an anonymous Whop plan: that would silently break account linking.
       if(!user?.discordId)return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent('/offres'));
-      try{
-        return res.redirect(302,await createCheckout(billingEnv,user,plan,origin));
-      }catch(error){
-        console.error('Discord-attributed checkout unavailable',plan.id,error?.name);
-        return res.redirect(303,'/offres?checkout_error=unavailable');
-      }
+      // Preserve the existing, working Whop checkout while the attributed
+      // checkout API integration is being repaired. Do not claim automatic
+      // Discord purchase attribution from a plain checkout URL.
+      const target=new URL(plan.checkoutUrl);
+      if(target.protocol!=='https:'||!['whop.com','www.whop.com'].includes(target.hostname)||
+        !/^\/checkout\/plan_[A-Za-z0-9]+\/?$/.test(target.pathname)||
+        target.username||target.password||target.port||target.search||target.hash)
+        return res.redirect(302,'/offres');
+      return res.redirect(302,target.href);
     }
     return res.status(404).end();
   } catch(e){if(e instanceof RangeError)return res.status(413).end();if(e instanceof SyntaxError)return res.status(400).end();console.error('Bro Client request failed',path,e.name);return res.status(503).json({error:'Service momentanément indisponible.'});}
