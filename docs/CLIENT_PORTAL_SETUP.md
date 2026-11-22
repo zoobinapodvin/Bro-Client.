@@ -73,3 +73,22 @@ A customer with a verified active pass and no key sees the **support ticket** in
 
 ## Discord disconnect
 The dashboard's **Déconnecter Discord** button signs the browser out and clears local session cookies. It deliberately does **not** delete the Discord account's trusted purchase association, to avoid locking customers out of licenses. Full identity unlinking requires a second sign-in method and a separate account-recovery design.
+
+
+## Recent purchases, Discord names and public announcements
+
+The homepage includes a five-entry feed of **real verified payments**. It polls the public \`/api/activity\` endpoint every 15 seconds while visible and shows the product, actual charged EUR amount and the payment date/time in Europe/Paris. It never invents purchases.
+
+By default, buyers appear as **Client BRO** with no personal avatar or e-mail. A connected buyer can optionally allow their **Discord pseudonym/avatar** to appear for future verified checkouts under **Aide > Afficher mon pseudo et avatar** in the customer portal. They can revoke that preference; existing activity records are anonymized. No Whop e-mail, personal IDs, key or payment ID appears in the public feed. Old Whop-only buyers remain anonymous because they have not given consent on this site.
+
+To enable a short public Discord announcement per new verified payment, create a **fresh** incoming webhook on the intended community channel and add this as a Sensitive Vercel production environment variable:
+
+\`BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY\`
+
+**Do not use the earlier webhook URL sent in chat.** A Discord webhook URL is an authorization secret; delete that webhook and create another one privately. Announcement text rotates among five short professional phrases. Usernames are published only with consent; otherwise notifications say \`Un client\`.
+
+Historic payments: the owner can click **Administration > Importer achats Whop** once \`WHOP_API_KEY\` is configured. The import reads up to the latest 100 payments per run with Whop's authenticated \`GET /payments\` API, checks paid status, this company's ID and the four official product IDs, and adds them **anonymously** to the public feed. It does not grant old buyers a download, Discord role or license without a verified account link. If the new public webhook is configured, only **one** historic summary message is posted, not a burst of unsolicited pings.
+
+The public announcements and historic imports cannot run until the Whop API access is configured. The regular Whop signed webhook remains mandatory for live verified purchases. After setting production environment variables, redeploy Vercel.
+
+The client portal uses no internal scrollbar: navigation tabs show only relevant sections, and the license row appears only with an active verified entitlement. The Discord identity endpoint returns the pseudonym and safe Discord avatar URL but not the buyer's email.
