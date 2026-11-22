@@ -1,1 +1,26 @@
-{"buildCommand":"node build.mjs","outputDirectory":"dist","rewrites":[{"source":"/api/:path*","destination":"/api/platform?route=api/:path*"},{"source":"/auth/:path*","destination":"/api/platform?route=auth/:path*"},{"source":"/checkout/:plan","destination":"/api/platform?route=checkout/:plan"},{"source":"/media/:id","destination":"/api/platform?route=media/:id"}]}
+{
+  "buildCommand": "node build.mjs",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/offres",
+      "destination": "/offres.html"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/platform?route=api/:path*"
+    },
+    {
+      "source": "/auth/:path*",
+      "destination": "/api/platform?route=auth/:path*"
+    },
+    {
+      "source": "/checkout/:plan",
+      "destination": "/api/platform?route=checkout/:plan"
+    },
+    {
+      "source": "/media/:id",
+      "destination": "/api/platform?route=media/:id"
+    }
+  ]
+}

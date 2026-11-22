@@ -36,8 +36,8 @@ function render(){
     if(logo){const img=new Image();img.alt=c.brand;img.src=logo;el.replaceChildren(img);}
     else {const mark=block('span',c.brand,'mark');el.replaceChildren(mark);}
   });
-  $('.art').style.backgroundImage=asset(c.heroImage) ? 'url('+JSON.stringify(asset(c.heroImage))+')' : 'none';
-  $('#plans').replaceChildren(...site.plans.map(plan=>{
+  if($('.art')) $('.art').style.backgroundImage=asset(c.heroImage) ? 'url('+JSON.stringify(asset(c.heroImage))+')' : 'none';
+  $('#plans')?.replaceChildren(...site.plans.map(plan=>{
     const card=block('article',undefined,'plan '+plan.id);
     const row=block('div',undefined,'plan-top');
     const frame=block('div',{day:'J',week:'S',month:'M',life:'∞'}[plan.id],'item');frame.setAttribute('aria-hidden','true');row.append(frame);
@@ -178,9 +178,22 @@ $('.close').onclick=()=>modal.close();modal.addEventListener('click',e=>{if(e.ta
 document.querySelectorAll('[data-account]').forEach(el=>el.onclick=account);
 const menu=$('nav');const hamburger=$('.hamb');hamburger.onclick=()=>{const show=menu.classList.toggle('open');hamburger.setAttribute('aria-expanded',String(show));};
 menu.querySelectorAll('a').forEach(el=>el.onclick=()=>{menu.classList.remove('open');hamburger.setAttribute('aria-expanded','false');});
-const sections=Array.from(menu.querySelectorAll('a')).map(a=>[a,$(a.hash)]);
-function updateNav(){let current=sections[0];for(const pair of sections)if(pair[1].getBoundingClientRect().top<=Math.min(180,innerHeight*.3))current=pair;for(const [a] of sections)if(a===current[0])a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');}
+const sections=Array.from(menu.querySelectorAll('a[href^="#"]')).map(a=>[a,document.getElementById(a.hash.slice(1))]).filter(([,section])=>section);
+function updateNav(){if(!sections.length)return;let current=sections[0];for(const pair of sections)if(pair[1].getBoundingClientRect().top<=180)current=pair;for(const [a] of sections)if(a===current[0])a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');}
 window.addEventListener('scroll',updateNav,{passive:true});
+if(location.hash==='#tarifs')location.replace('/offres');
+const gallery=$('.gallery-strip');
+if(gallery){
+ const slides=[['launcher','Le launcher'],['visuals','Affichage en jeu'],['settings','Interface de réglages'],['appearance','Options du joueur']];
+ for(const [file,label] of slides){
+   const src='/assets/preview-'+file+'.webp';
+   const select=button(label,()=>{
+     $('#preview').src=src;$('#preview').alt=label+' — capture de Bro Client';$('#caption').textContent=label;$('#full-preview').href=src;
+     for(const item of gallery.children)item.setAttribute('aria-pressed',String(item===select));
+   },'preview-tab');
+   select.setAttribute('aria-pressed',String(file==='launcher'));gallery.append(select);
+ }
+}
 (async()=>{
   const session=loadUser();
   try{const res=await fetch('/api/site',{cache:'no-store'});if(!res.ok)throw Error();site=await res.json();if(!site.content||!site.plans)throw Error();}

@@ -10,3 +10,31 @@ dialog{color:var(--fg);background:#161616;border:1px solid #434343;border-radius
 @media(max-width:760px){.mobile-dock{display:flex;position:fixed;z-index:3;bottom:0;inset-inline:0;justify-content:space-around;align-items:center;background:#101010f5;border-top:1px solid #383838;padding:5px 8px max(5px,env(safe-area-inset-bottom));backdrop-filter:blur(14px)}.mobile-dock>*{font:600 .86rem/1 system-ui;border:0;background:transparent;color:#eee;padding:16px 10px}.foot{padding-bottom:80px}.account,.hamb,.close{min-height:44px;min-width:44px}dialog{max-height:88dvh;overscroll-behavior:contain}.bar nav.open{background:#151515}.actions .discord{display:inline-flex}}
 @media(max-width:520px){.art{left:0;background-position:50% 48%;background-size:100% auto;inset-block-start:42%}.hero:after{background:linear-gradient(180deg,#070707 0%,#070707 48%,transparent 72%)}.hero-inner{padding-block:32px 215px}.hero-copy h1{font-size:clamp(44px,12vw,62px)}.hero-copy p{max-width:100%}.hero-copy{max-width:100%}.actions{flex-wrap:wrap}.foot{padding-bottom:85px}.plan-button{min-height:44px}}
 [hidden]{display:none!important}
+
+/* Steel-blue palette from the BRO launcher. */
+:root{--aqua:#b4c8e0;--bg:#11151b;--panel:#191f28;--fg:#eef2f7;--muted:#9ca9bb;--stroke:#334052}
+body{background:var(--bg);color:var(--fg)}
+header,.mobile-dock,footer,.feature-bg,.bar nav.open{background:#131820;border-color:var(--stroke)}
+header{box-shadow:0 1px 0 #b4c8e009}
+.hero,.pass-intro{background:#11151b;border-bottom:1px solid var(--stroke)}
+.hero:after{background:linear-gradient(90deg,#11151b 18%,#11151bf7 34%,transparent 73%)}
+.hero h1 em,.offers h1 em{font-style:normal;color:var(--aqua);background:linear-gradient(110deg,#9ca9bb 8%,#eef2f7 34%,#b4c8e0 60%,#cbd7e7 85%);background-clip:text;-webkit-text-fill-color:transparent}
+.btn.cyan{background:linear-gradient(115deg,#b4c8e0,#d9e2ee 48%,#aec2d9);color:#11151b;border-color:#c3d3e7}
+.btn,.account,.preview-tab,.plan{transition:transform .2s ease,background-color .2s ease,border-color .2s ease}
+.btn:hover,.preview-tab:hover{transform:translateY(-2px)}.account,.ghost,.hamb,.close,.features article,.account-block,dialog,.editor .notice{background:#191f28;color:var(--fg);border-color:var(--stroke)}
+.hero p,.heading p,.plan p,.features p,.faq p,dialog p,.foot p,.checkout-note,.crumb,.legal p,.offers p{color:var(--muted)}
+.under,.kicker,.account i,.features i,.item,.account-block a{color:var(--aqua)}
+.under{text-decoration:underline;text-underline-offset:5px;font-weight:650}
+.gallery-frame{border:1px solid var(--stroke);border-radius:20px;background:linear-gradient(130deg,#232d3b,#191f28 50%,#151b22);padding:clamp(12px,2vw,26px)}
+.gallery-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.preview-tab{padding:10px 15px;background:#161c24;color:var(--muted);border:1px solid var(--stroke);border-radius:20px;font-weight:600}.preview-tab[aria-pressed=true]{background:var(--aqua);border-color:var(--aqua);color:#11151b}
+.gallery figure{margin:0}.gallery figure a{display:grid;place-items:center;overflow:hidden;background:#0c1015;border-radius:12px}.gallery figure img{width:100%;height:clamp(260px,42vw,515px);object-fit:contain}.gallery figcaption{margin-top:12px;color:var(--muted);font-size:.9rem}
+.pass-intro{position:relative;overflow:hidden;background:radial-gradient(ellipse at 80% 30%,#354454 0%,#191f28 43%,#11151b 78%)}
+.pass-grid{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:6%;padding-block:clamp(38px,5vw,80px)}
+.offers h1{font-size:clamp(52px,7vw,100px);letter-spacing:-.075em;line-height:.99;margin:22px 0}.offers h1 em{display:block}.offers .pass-grid p{max-width:420px;font-size:1.05rem;line-height:1.65;margin:0 0 24px}.crumb{font-size:.84rem}
+.product-shot{margin:0;position:relative;transform:perspective(1100px) rotateY(-7deg) rotateZ(1deg);padding:2px;background:linear-gradient(135deg,#9ca9bb 0%,#364353 25%,#1a222b 60%,#b4c8e0);border-radius:15px;box-shadow:0 22px 65px #03070d88;animation:arrive .7s ease-out both}.product-shot img{display:block;width:100%;height:auto;border-radius:13px}
+.plan,.plan.life{background:linear-gradient(135deg,#222b37,#191f28 62%);border-color:#384353}.plan.life{background:linear-gradient(135deg,#364452,#1a222d 65%);border-color:#8598ab}
+.plan:hover{transform:translateY(-4px);border-color:var(--aqua)}.plan .plan-button,.plan.life .plan-button{background:#2a3542;color:var(--fg);border-color:#455467}.plan.life .plan-button{background:var(--aqua);color:#11151b}.plan .badge{background:#283749;color:#d0def0;border-color:#4b6075}.checkout-note{font-size:.92rem;margin:20px 0 0}
+@keyframes arrive{from{opacity:.15;translate:0 12px}to{opacity:1;translate:0 0}}
+@media(max-width:760px){.pass-grid{gap:22px}.gallery-strip{display:grid;grid-template-columns:1fr 1fr}.preview-tab{min-height:44px}.gallery figure img{height:auto;max-height:360px;aspect-ratio:4/3}.mobile-dock{background:#191f28f5}.offers .pass-grid p{font-size:1rem}}
+@media(max-width:520px){.hero:after{background:linear-gradient(180deg,#11151b 0%,#11151b 47%,transparent 72%)}.pass-grid{grid-template-columns:1fr;padding-block:30px}.product-shot{width:83%;margin:2px auto 0}.pass-grid h1 em{display:inline}.gallery .heading{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.gallery-strip{gap:6px}.preview-tab{font-size:.84rem;padding:8px}.offers .pricing .heading p{max-width:100%}.offers .plan{min-width:0}.offers .plan-button{white-space:normal}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.plan:hover,.btn:hover,.preview-tab:hover{transform:none}}

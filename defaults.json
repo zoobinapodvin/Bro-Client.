@@ -4,7 +4,7 @@
     "brandLogo": "/assets/wordmark.webp",
     "heroImage": "/assets/bro-cover.webp",
     "navHome": "Accueil",
-    "navPlans": "Tarifs",
+    "navPlans": "Offres",
     "navFeatures": "Le club",
     "navFaq": "FAQ",
     "accountLabel": "Espace client",
@@ -15,8 +15,8 @@
     "primary": "Découvrir les offres",
     "secondary": "Rejoindre le Discord",
     "pricingLabel": "BOUTIQUE",
-    "pricingTitle": "Choisis ton accès",
-    "pricingIntro": "Quatre durées, un même accès. Achat direct sur Whop.",
+    "pricingTitle": "Choisis ton pass",
+    "pricingIntro": "Un seul paiement. Choisis la durée qui te convient.",
     "featureLabel": "LE CLUB",
     "featureTitle": "Ton espace BRO.",
     "featureIntro": "Les ressources et la communauté réunies au même endroit.",
@@ -34,7 +34,7 @@
     "a2": "Ouvre ton espace client, puis la rubrique Factures. Connecte-toi à Whop avec le compte utilisé pour ton achat et sélectionne le paiement concerné.",
     "q3": "Faut-il un compte pour acheter ?",
     "a3": "Tu peux choisir un pass et payer sur Whop directement. Le compte Bro Client te donne accès aux guides et au raccourci vers tes factures.",
-    "planButton": "Choisir cette offre",
+    "planButton": "Accéder au paiement",
     "lifetimeBadge": "LIFETIME",
     "footer": "Bro Client · Boutique officielle",
     "legalIdentity": "Bro Client.",
@@ -52,7 +52,7 @@
       "duration": "1 jour",
       "price": 10,
       "description": "Pour découvrir le client.",
-      "checkoutUrl": "https://whop.com/bro-client/bro-client-1-jour/"
+      "checkoutUrl": "https://whop.com/checkout/plan_MCtWYReKKKb9m/"
     },
     {
       "id": "week",
@@ -60,7 +60,7 @@
       "duration": "1 semaine",
       "price": 20,
       "description": "Pour plusieurs sessions.",
-      "checkoutUrl": "https://whop.com/bro-client/bro-client-1-semaine/"
+      "checkoutUrl": "https://whop.com/checkout/plan_kPcl5mzGmRq2Q/"
     },
     {
       "id": "month",
@@ -68,7 +68,7 @@
       "duration": "1 mois",
       "price": 50,
       "description": "Pour jouer au quotidien.",
-      "checkoutUrl": "https://whop.com/bro-client/bro-client-1-mois/"
+      "checkoutUrl": "https://whop.com/checkout/plan_iN2Oc79WLycrs/"
     },
     {
       "id": "life",
@@ -76,7 +76,7 @@
       "duration": "À vie",
       "price": 100,
       "description": "Pour un accès permanent.",
-      "checkoutUrl": "https://whop.com/bro-client/bro-client-04/"
+      "checkoutUrl": "https://whop.com/checkout/plan_p90wN1m6OLoEH/"
     }
   ]
 }

@@ -65,7 +65,7 @@ export default async function handler(req,res) {
     if(/^\/checkout\/(day|week|month|life)$/.test(path)&&req.method==='GET'){
       
       const {site:config}=await site();const plan=config.plans.find(p=>path==='/checkout/'+p.id);
-      if(!plan?.checkoutUrl)return res.redirect(302,'/#tarifs');
+      if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
       return res.redirect(302,user ? await createCheckout(billingEnv,user.id,plan,origin) : plan.checkoutUrl);
     }
     return res.status(404).end();
