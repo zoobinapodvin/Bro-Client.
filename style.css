@@ -346,3 +346,68 @@ header{box-shadow:0 1px 0 #b4c8e009}
   .purchase-board-date{grid-column:2;grid-row:2;font-size:10px}
   .purchase-board-photo{width:35px;height:35px}
 }
+
+
+/* BRO offer cards v4 — metallic game artwork, consistent wide mobile format */
+.offers .plans{gap:clamp(12px,1.6vw,20px);align-items:stretch}
+.offers .plan,.offers .plan.life{
+ display:flex;flex-direction:column;min-width:0;padding:12px 12px 15px;
+ border:1px solid #53657a;border-radius:18px;
+ background:linear-gradient(148deg,#253140 0%,#1a222d 55%,#151c26 100%);
+ box-shadow:inset 0 1px 0 #ffffff1c,0 14px 34px #070b1230;
+ transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.offers .plan.life{border-color:#8499af;background:linear-gradient(148deg,#303f50,#1b2633 60%,#19232e)}
+.offers .plan-top{
+ position:relative;isolation:isolate;overflow:hidden;flex:initial;
+ display:flex;align-items:flex-end;justify-content:space-between;
+ width:100%;height:auto;min-height:110px;aspect-ratio:16/7;
+ margin:0 0 18px;padding:14px;border-radius:12px;
+ background:linear-gradient(135deg,#556779,#253444);
+}
+.offers .plan-top::before{
+ content:"";position:absolute;inset:0;z-index:-2;
+ background-image:linear-gradient(90deg,#101b2bbf,#1525369c 54%,#1a283b8c),var(--bro-game-art,none);
+ background-size:cover;background-position:center 49%;
+ opacity:.27;transform:none;filter:saturate(.75) grayscale(.12);
+}
+.offers .plan-top::after{
+ content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+ border-radius:inherit;
+ background:repeating-radial-gradient(ellipse at 15% 40%,transparent 0 10px,#e0efff19 11px,transparent 12px 18px),
+ linear-gradient(160deg,#ffffff22,transparent 42%,#050c1745);
+}
+.offers .week .plan-top{background:linear-gradient(135deg,#48546c,#2b374c)}
+.offers .month .plan-top{background:linear-gradient(135deg,#526b82,#283c52)}
+.offers .life .plan-top{background:linear-gradient(135deg,#a6b8cc,#637b97);color:#fff}
+.offers .life .plan-top::before{filter:grayscale(.2);opacity:.23}
+.offers .life .plan-top::after{filter:none}
+.offers .pass-mark,.offers .pass-duration{position:relative;z-index:1;text-shadow:0 1px 8px #09142190}
+.offers .plan h3,.offers .plan p,.offers .plan .amount{margin-inline:7px}
+.offers .plan h3{font-size:clamp(1.08rem,1.6vw,1.32rem);line-height:1.25}
+.offers .plan p{min-height:2.5em;line-height:1.4}
+.offers .plan .amount{margin-block:auto 20px;padding-top:22px}
+.offers .plan-button{min-height:48px;touch-action:manipulation;transition:background-color .15s,border-color .15s}
+.offers .plan-button:active{transform:scale(.985)}
+@media(hover:hover) and (pointer:fine){
+ .offers .plan:hover{transform:translateY(-4px);border-color:#a1bad3;box-shadow:inset 0 1px #ffffff25,0 20px 44px #060b164d}
+}
+@media(max-width:960px){.offers .plans{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){
+ .offers .plans{grid-template-columns:1fr;gap:13px}
+ .offers .plan,.offers .plan.life{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;
+  column-gap:12px;row-gap:5px;padding:11px 12px 12px;border-radius:16px;
+ }
+ .offers .plan-top{grid-column:1/-1;grid-row:auto;min-height:0;height:auto;aspect-ratio:16/6;
+  margin:0 0 7px;padding:12px 14px;flex-direction:row;align-items:flex-end}
+ .offers .plan h3{grid-column:1;grid-row:auto;margin:0;font-size:1.13rem}
+ .offers .plan p{grid-column:1;grid-row:auto;margin:0;min-height:0;font-size:.81rem}
+ .offers .plan .amount{grid-column:2;grid-row:2/4;margin:0;padding:0;display:flex;
+  flex-direction:column;align-items:flex-end;gap:3px}
+ .offers .amount strong{font-size:clamp(1.6rem,6vw,2rem);white-space:nowrap}
+ .offers .amount small{font-size:.65rem;white-space:nowrap}
+ .offers .plan .plan-button{grid-column:1/-1;grid-row:auto;margin-top:9px;min-height:45px}
+}
+@media(max-width:360px){.offers .plan{column-gap:6px}.offers .plan-top{aspect-ratio:16/7}.offers .amount strong{font-size:1.55rem}}
+@media(prefers-reduced-motion:reduce){.offers .plan,.offers .plan-button{transition:none!important;transform:none!important}}
