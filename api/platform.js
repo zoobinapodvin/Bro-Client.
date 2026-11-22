@@ -3,6 +3,7 @@ import {readSite,saveSite,upload} from '../lib/store.mjs';
 import {session,exchange,startDiscord,clear,destination} from '../lib/auth.mjs';
 import {createCheckout,handleBilling,hasConfirmedPurchase} from '../lib/billing.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
+import {communityStats} from '../lib/community.mjs';
 const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET};
 async function body(req,max) {
   const chunks=[];let size=0;
@@ -26,6 +27,11 @@ export default async function handler(req,res) {
     const isInteraction=path==='/api/discord/interactions';
     if(req.method==='POST'&&!isWebhook&&!isInteraction&&req.headers.origin!==origin)return res.status(403).end();
     const site=()=>readSite(bucket);
+    if(path==='/api/discord/community'&&req.method==='GET'){
+      const counts=await communityStats();
+      res.setHeader('Cache-Control','public, s-maxage=120, stale-while-revalidate=300');
+      return res.json(counts);
+    }
     if(path==='/api/site'&&req.method==='GET'){
       const {site:config,revision}=await site();return res.json({...config,revision});
     }

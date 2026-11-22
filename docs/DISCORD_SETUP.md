@@ -13,7 +13,7 @@ Dans l'application Discord **Bro Client** :
 - **Bot** : créer le bot puis générer/copier son token. Ne jamais envoyer ce token dans un message ou le placer dans le code.
 - **Installation** : activer `Guild Install`, scopes `bot` et `applications.commands`, permission **Manage Roles** uniquement (bitfield `268435456`).
 - Installer l'application sur le serveur depuis le lien Guild Install avec un compte possédant **Gérer le serveur**.
-- Placer le rôle du bot **au-dessus** du rôle `Client` dans les réglages des rôles Discord.
+- Placer le rôle du bot **au-dessus** des rôles `Customer` et `Lifetime` dans les réglages des rôles Discord.
 - Dans **General Information**, récupérer `Application ID` et `Public Key`.
 - Dans les paramètres des interactions, indiquer `https://www.broclient.com/api/discord/interactions` seulement *après* avoir ajouté la clé publique dans Vercel et redéployé le site.
 
@@ -27,8 +27,9 @@ Ajouter ces variables dans **Production** :
 | `BRO_DISCORD_BOT_TOKEN` | Discord > Bot > Token ; **Sensitive** |
 | `BRO_DISCORD_APPLICATION_ID` | Discord > General Information > Application ID |
 | `BRO_DISCORD_PUBLIC_KEY` | Discord > General Information > Public Key (hex) |
-| `BRO_DISCORD_GUILD_ID` | Discord > clic droit serveur > Copier l'identifiant |
-| `BRO_DISCORD_CUSTOMER_ROLE_ID` | Discord > clic droit sur le rôle Client > Copier l'identifiant |
+| `BRO_DISCORD_GUILD_ID` | Serveur Bro Client : `1448897452404117558` |
+| `BRO_DISCORD_CUSTOMER_ROLE_ID` | Rôle Customer : `1574096039663898766` |
+| `BRO_DISCORD_LIFETIME_ROLE_ID` | Rôle Lifetime : `1574096085197131957` |
 | `CRON_SECRET` | Long secret aléatoire ; **Sensitive**, protège le nettoyage des rôles expirés |
 
 Après l'ajout des variables : effectuer un **nouveau déploiement Production**. Le cron de l'application s'exécute toutes les heures pour retirer le rôle des clients dont les passes Jour, Semaine ou Mois sont expirés. Le pass Lifetime n'expire pas.
@@ -50,7 +51,9 @@ Une fois Whop + le bot configurés :
 
 - L'utilisateur doit être connecté à Bro Client avec Discord **avant** de commencer un checkout.
 - Le paiement signé enregistre la facture et la durée du pass (Jour 24 h, Semaine 7 jours, Mois 30 jours, Lifetime permanent).
-- Le rôle client est attribué uniquement au compte Discord associé au paiement et présent sur le serveur.
+- Les pass Jour, Semaine et Mois donnent le rôle **Customer**.
+- Le pass Lifetime donne **Customer** ET **Lifetime**.
+- Les rôles sont attribués uniquement au compte Discord associé au paiement confirmé et présent sur le serveur.
 - Les achats effectués comme invité **ne sont pas liés** au compte Discord et ne déclenchent donc pas de rôle automatiquement.
 
 ## 5. Activation des commandes
@@ -74,3 +77,14 @@ L'endpoint Discord vérifie systématiquement les signatures Ed25519 avant toute
 8. Vérifier qu'un rôle est retiré après expiration du pass et non pour un Lifetime.
 
 **Limites :** sans jeton de bot, autorisation Guild Install, rôle cible, et intégration Whop configurée, les rôles ne peuvent pas être synchronisés. Il n'est pas possible d'installer une application sur un serveur tiers sans l'autorisation d'un administrateur du serveur.
+
+## 7. Tarifs officiels 22 novembre 2026
+
+| Pass | Prix de vente affiché |
+|---|---:|
+| Jour | 6 € |
+| Semaine | 15 € |
+| Mois | 35 € |
+| Lifetime | 100 € |
+
+Chaque lien de checkout doit correspondre au bon produit Whop, à un plan **one_time**, à la devise EUR et au prix ci-dessus. Les prix du site ne vérifient pas à eux seuls le montant final facturé par Whop ; une vérification indépendante de chacun des quatre checkouts dans Whop est nécessaire. Sans accès authentifié à Whop ou API marchand, on ne peut pas confirmer cette partie.

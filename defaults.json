@@ -33,8 +33,8 @@
     "q2": "Où retrouver mes factures ?",
     "a2": "Ouvre ton espace client, puis la rubrique Factures. Connecte-toi à Whop avec le compte utilisé pour ton achat et sélectionne le paiement concerné.",
     "q3": "Faut-il un compte pour acheter ?",
-    "a3": "Tu peux choisir un pass et payer sur Whop directement. Le compte Bro Client te donne accès aux guides et au raccourci vers tes factures.",
-    "planButton": "Accéder au paiement",
+    "a3": "Connecte-toi avec Discord avant ton achat pour associer ton pass à ton compte Bro Client et permettre l'attribution des rôles sur le serveur.",
+    "planButton": "Obtenir mon pass",
     "lifetimeBadge": "LIFETIME",
     "footer": "Bro Client · Boutique officielle",
     "legalIdentity": "Bro Client.",
@@ -50,7 +50,7 @@
       "id": "day",
       "name": "Pass Jour",
       "duration": "1 jour",
-      "price": 10,
+      "price": 6,
       "description": "Pour découvrir le client.",
       "checkoutUrl": "https://whop.com/checkout/plan_MCtWYReKKKb9m/"
     },
@@ -58,7 +58,7 @@
       "id": "week",
       "name": "Pass Semaine",
       "duration": "1 semaine",
-      "price": 20,
+      "price": 15,
       "description": "Pour plusieurs sessions.",
       "checkoutUrl": "https://whop.com/checkout/plan_kPcl5mzGmRq2Q/"
     },
@@ -66,7 +66,7 @@
       "id": "month",
       "name": "Pass Mois",
       "duration": "1 mois",
-      "price": 50,
+      "price": 35,
       "description": "Pour jouer au quotidien.",
       "checkoutUrl": "https://whop.com/checkout/plan_iN2Oc79WLycrs/"
     },
