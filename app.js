@@ -84,7 +84,8 @@ function account(){
       const result=await res.json();
       if(!res.ok)throw Error(result.error||'Erreur de synchronisation.');
       const labels={
-        role_granted:'Rôle client activé sur ton compte Discord.',
+        role_granted:'Rôle Customer activé sur ton compte Discord.',
+        role_granted_lifetime:'Rôles Customer et Lifetime activés sur ton compte Discord.',
         role_expired:'Ton pass est expiré ; le rôle a été retiré.',
         no_purchase:'Aucun achat vérifié associé à ton compte Discord. Les achats invités ne peuvent pas être reconnus automatiquement.',
         bot_unconfigured:'L’installation du bot Discord n’est pas encore terminée.',
