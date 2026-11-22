@@ -49,7 +49,7 @@ function render(){
   $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');el.append(block('summary',c['q'+i]),block('p',c['a'+i]));return el;}));
 }
 function openDialog(title) {
-  modal.classList.remove('editing');body.replaceChildren();
+  modal.classList.remove('editing','client-portal');body.classList.remove('client-portal-body');body.replaceChildren();
   const heading=block('h2',title);heading.id='dialogTitle';body.append(heading);modal.setAttribute('aria-labelledby','dialogTitle');
   if(!modal.open)modal.showModal();modal.scrollTop=0;
 }
