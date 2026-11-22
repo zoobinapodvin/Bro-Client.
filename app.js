@@ -2,7 +2,6 @@
 const $ = selector => document.querySelector(selector);
 const modal = $('#modal');
 const body = $('#modalBody');
-const artwork = {day:'emerald', week:'diamond', month:'amethyst', life:'star'};
 const paths = {
   user:'<circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/>',
   grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
@@ -41,7 +40,7 @@ function render(){
   $('#plans').replaceChildren(...site.plans.map(plan=>{
     const card=block('article',undefined,'plan '+plan.id);
     const row=block('div',undefined,'plan-top');
-    const frame=block('div',undefined,'item'); const img=new Image();img.src='/assets/'+artwork[plan.id]+'.png';img.alt='';frame.append(img);row.append(frame);
+    const frame=block('div',{day:'J',week:'S',month:'M',life:'∞'}[plan.id],'item');frame.setAttribute('aria-hidden','true');row.append(frame);
     if(plan.id==='life')row.append(block('span',c.lifetimeBadge,'badge'));
     const price=block('div',undefined,'amount');
     price.append(block('strong',new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(plan.price)+' €'),block('small','/ '+plan.duration));
@@ -72,8 +71,9 @@ function account(){
   const portal=link('Ouvrir mes achats sur Whop','https://whop.com/@me/settings/orders/');portal.target='_blank';portal.rel='noopener noreferrer';
   invoices.append(block('h3','Mes factures'),results,portal);body.append(invoices);
   loadInvoices(results);
+  const section=block('section',undefined,'account-block');section.append(block('h3','Mes guides'),button('Consulter les guides',()=>guides(false)));body.append(section);
   const area=block('div',undefined,'modal-actions');
-  if(user.admin)area.append(button('Administrer le site',editor,'btn cyan'));
+  if(user.admin)area.append(button('Administrer le site',editor,'btn cyan'),button('Gérer les guides',()=>guides(true)));
   area.append(link('Se déconnecter','/auth/logout','btn ghost'));body.append(area);
 }
 async function loadInvoices(target,cursor) {
@@ -95,11 +95,40 @@ async function loadInvoices(target,cursor) {
   }catch{note.textContent='Le relevé est temporairement indisponible. Tes achats restent accessibles sur Whop.';}
 }
 const labels={
- brand:'Nom de marque',brandLogo:'Logo',heroImage:'Illustration de l’accueil',navHome:'Lien Accueil',navPlans:'Lien Tarifs',navFeatures:'Lien Fonctionnalités',navFaq:'Lien FAQ',accountLabel:'Espace client',
+ legalIdentity:'Identité et statut juridique',legalAddress:'Adresse professionnelle',legalRegistration:'Immatriculation et TVA',legalDirector:'Responsable de publication',legalContact:'E-mail public',legalPhone:'Téléphone professionnel',legalMediator:'Nom, adresse et site du médiateur',brand:'Nom de marque',brandLogo:'Logo',heroImage:'Illustration de l’accueil',navHome:'Lien Accueil',navPlans:'Lien Tarifs',navFeatures:'Lien Fonctionnalités',navFaq:'Lien FAQ',accountLabel:'Espace client',
  eyebrow:'Étiquette',titleLine1:'Titre, première ligne',titleLine2:'Titre, deuxième ligne',intro:'Présentation',primary:'Bouton principal',secondary:'Bouton secondaire',
  pricingLabel:'Étiquette',pricingTitle:'Titre',pricingIntro:'Description',planButton:'Bouton de l’offre',lifetimeBadge:'Badge Lifetime',
  featureLabel:'Étiquette',featureTitle:'Titre',featureIntro:'Description',feature1Title:'Premier titre',feature1Text:'Premier texte',feature2Title:'Deuxième titre',feature2Text:'Deuxième texte',feature3Title:'Troisième titre',feature3Text:'Troisième texte',faqLabel:'Étiquette',faqTitle:'Titre',q1:'Question 1',a1:'Réponse 1',q2:'Question 2',a2:'Réponse 2',q3:'Question 3',a3:'Réponse 3',footer:'Texte du pied de page',name:'Nom',duration:'Durée',price:'Prix en euros',description:'Description',checkoutUrl:'Lien de paiement Whop'
 };
+async function guides(edit){
+  openDialog(edit?'Gérer les guides':'Mes guides');
+  const container=block('div'),status=block('p','Chargement…','notice');status.setAttribute('role','status');body.append(container,status,button('Retour au compte',account));
+  try{
+    const result=await fetch('/api/guides');if(!result.ok)throw Error();
+    const {guides:items,revision}=await result.json();status.textContent='';
+    function draw(){
+      container.replaceChildren();
+      if(!items.length)container.append(block('p','Aucun guide publié pour le moment.'));
+      items.forEach((guide,i)=>{
+        if(!edit){const details=block('details',undefined,'account-block');details.append(block('summary',guide.title),block('p',guide.body,'guide-body'));container.append(details);return;}
+        const section=block('section',undefined,'editor account-block');
+        for(const [key,label] of [['title','Titre'],['body','Contenu']]){
+          const field=block('label',label),input=block(key==='body'?'textarea':'input');input.value=guide[key];input.oninput=()=>guide[key]=input.value;field.append(input);section.append(field);
+        }
+        section.append(button('Retirer ce guide',()=>{items.splice(i,1);draw();}));container.append(section);
+      });
+      if(edit){
+        const save=button('Publier les modifications',async()=>{
+          save.disabled=true;
+          try{const res=await fetch('/api/guides',{method:'POST',headers:{'Content-Type':'application/json','If-Match':revision},body:JSON.stringify({guides:items})});
+          if(!res.ok){status.textContent=res.status===409?'Une autre session a modifié les guides. Rouvre le catalogue.':'Vérifie les titres, les contenus et la taille du catalogue.';return;}await guides(true);body.append(block('p','Catalogue publié.','notice'));}catch{status.textContent='Enregistrement indisponible.';}finally{save.disabled=false;}
+        },'btn cyan');
+        container.append(button('Ajouter un guide',()=>{items.push({title:'',body:''});draw();container.querySelector('section:last-of-type input')?.focus();}),save);
+      }
+    }
+    draw();
+  }catch{status.textContent='Les guides sont momentanément indisponibles.';}
+}
 function editor(){
   if(!user?.admin)return;
   openDialog('Administration');modal.classList.add('editing');
@@ -127,6 +156,7 @@ function editor(){
     });form.append(section);
   }
   group('Identité et navigation',draft.content,['brand','brandLogo','navHome','navPlans','navFeatures','navFaq','accountLabel','footer']);
+  group('Informations légales',draft.content,['legalIdentity','legalAddress','legalRegistration','legalDirector','legalContact','legalPhone','legalMediator']);
   group('Accueil',draft.content,['heroImage','eyebrow','titleLine1','titleLine2','intro','primary','secondary']);
   group('Boutique',draft.content,['pricingLabel','pricingTitle','pricingIntro','planButton','lifetimeBadge']);
   draft.plans.forEach(plan=>group(plan.name,plan,['name','duration','price','description','checkoutUrl']));
