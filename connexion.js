@@ -3,7 +3,7 @@ const params=new URLSearchParams(location.search);
 const code=params.get('code');
 const next=params.get('return_to');
 const destinationField=document.querySelector('input[name="return_to"]');
-if(next&&/^\/checkout\/(day|week|month|life)$/.test(next))destinationField.value=next;
+if(next&&(next==='/offres'||/^\/checkout\/(day|week|month|life)$/.test(next)))destinationField.value=next;
 if(params.has('error')||location.hash.includes('error=')){
   message.textContent='La connexion Discord a été interrompue. Tu peux réessayer.';
 }
