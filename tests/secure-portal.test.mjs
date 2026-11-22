@@ -1,0 +1,99 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {generateKeyPairSync,sign} from 'node:crypto';
+import {listPaidPurchases,accountOverview,assignKey,readCustomerKey,encryptCustomerKey,
+ decryptCustomerKey,validUploadedExe} from '../lib/fulfillment.mjs';
+import {handleInteraction} from '../lib/discord.mjs';
+import {readFileSync} from 'node:fs';
+
+const buyer='1574096900000000001';
+const owner='1574096900000000002';
+const guild='1448897452404117558';
+const channel='1574104734124605460';
+const prefix='private/discord-entitlements/'+buyer+'/';
+const payment='pay_ABCDEF123456';
+const future=new Date(Date.now()+86400000).toISOString();
+const ledger=()=>({[prefix+payment]:{paymentId:payment,planId:'day',expiresAt:future}});
+const bucket=(data={})=>({
+  data,
+  async list({prefix}){
+    return {objects:Object.keys(this.data).filter(x=>x.startsWith(prefix)).map(key=>({key})),truncated:false,cursor:null};
+  },
+  async head(key){return this.data[key]?{pathname:key}:null;},
+  async get(key){return this.data[key]?{json:async()=>this.data[key]}:null;},
+  async put(key,value,options){
+    if(options?.onlyIf?.etagDoesNotMatch==='*'&&this.data[key])return null;
+    this.data[key]=JSON.parse(value);return {etag:'saved'};
+  }
+});
+test('no purchase exposes neither download nor license',async()=>{
+ const account=await accountOverview(bucket(),{discordId:buyer});
+ assert.equal(account.active,false);
+ assert.equal(account.downloadAvailable,false);
+ assert.equal(account.keyAvailable,false);
+ assert.equal(account.purchases.length,0);
+});
+test('verified paid purchase is shown while missing key stays hidden',async()=>{
+ const account=await accountOverview(bucket(ledger()),{discordId:buyer});
+ assert.equal(account.active,true);
+ assert.equal(account.keyAvailable,false);
+ assert.equal(account.downloadAvailable,false);
+ assert.equal(account.purchases[0].paymentId,payment);
+});
+test('license keys are encrypted, scoped to paid Discord identity and cannot be overwritten',async()=>{
+ const old=process.env.BRO_KEY_ENCRYPTION_KEY;
+ process.env.BRO_KEY_ENCRYPTION_KEY='a'.repeat(64);
+ try {
+   const store=bucket(ledger());
+   assert.deepEqual(await assignKey(store,{discordId:'1574096999999999999',key:'TEST-KEY-999',operatorId:owner}),{status:'no_purchase'});
+   assert.deepEqual(await assignKey(store,{discordId:buyer,key:'TEST-KEY-999',operatorId:owner}),{status:'assigned'});
+   const encrypted=store.data['private/customer-keys/'+buyer+'.json'];
+   assert.equal(JSON.stringify(encrypted).includes('TEST-KEY-999'),false);
+   assert.equal(await readCustomerKey(store,buyer),'TEST-KEY-999');
+   assert.deepEqual(await assignKey(store,{discordId:buyer,key:'ANOTHER-KEY',operatorId:owner}),{status:'already_assigned'});
+   assert.equal(decryptCustomerKey(encryptCustomerKey('TEST-KEY-999')),'TEST-KEY-999');
+ } finally {if(old===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=old;}
+});
+test('unknown and broken executables are never accepted',()=>{
+ assert.equal(validUploadedExe(Buffer.from('MZ')),false);
+ assert.equal(validUploadedExe(Buffer.alloc(2836992)),false);
+});
+test('portal contains only authenticated delivery endpoints and a real refresh action',()=>{
+ const site=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.ok(site.includes('/api/account/overview'));
+ assert.ok(site.includes('/api/account/download'));
+ assert.ok(site.includes('/api/account/key.txt'));
+ assert.ok(site.includes('Actualiser mes achats'));
+ assert.ok(site.includes('discordMark'));
+});
+test('signed /startkey is restricted to both the owner and staff channel',async t=>{
+ const old={owner:process.env.BRO_DISCORD_OWNER_USER_ID, guild:process.env.BRO_DISCORD_GUILD_ID,
+  pub:process.env.BRO_DISCORD_PUBLIC_KEY,secret:process.env.BRO_KEY_ENCRYPTION_KEY};
+ const {publicKey,privateKey}=generateKeyPairSync('ed25519');
+ const rawPublic=publicKey.export({format:'der',type:'spki'}).subarray(-32).toString('hex');
+ Object.assign(process.env,{BRO_DISCORD_OWNER_USER_ID:owner,BRO_DISCORD_GUILD_ID:guild,
+  BRO_DISCORD_PUBLIC_KEY:rawPublic,BRO_KEY_ENCRYPTION_KEY:'a'.repeat(64)});
+ t.after(()=>{
+  const vars={BRO_DISCORD_OWNER_USER_ID:old.owner,BRO_DISCORD_GUILD_ID:old.guild,
+   BRO_DISCORD_PUBLIC_KEY:old.pub,BRO_KEY_ENCRYPTION_KEY:old.secret};
+  for(const [key,value] of Object.entries(vars)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+ });
+ const store=bucket(ledger());
+ const payload=(who,where)=>({type:2,guild_id:guild,channel_id:where,member:{user:{id:who}},
+  data:{name:'startkey',options:[{name:'acheteur',value:buyer},{name:'cle',value:'TEST-KEY-123'}]}});
+ async function dispatch(event){
+  const raw=Buffer.from(JSON.stringify(event));
+  const time=String(Math.floor(Date.now()/1000));
+  const sig=sign(null,Buffer.concat([Buffer.from(time),raw]),privateKey).toString('hex');
+  const req={headers:{'x-signature-timestamp':time,'x-signature-ed25519':sig}};
+  const res={code:200,status(n){this.code=n;return this;},json(body){return {status:this.code,body};},end(){return {status:this.code};}};
+  return handleInteraction(req,res,raw,store);
+ }
+ const rogue=await dispatch(payload(buyer,channel));
+ assert.match(rogue.body.data.content,/réservée/);
+ const outside=await dispatch(payload(owner,'1574104734124605499'));
+ assert.match(outside.body.data.content,/réservée/);
+ const approved=await dispatch(payload(owner,channel));
+ assert.match(approved.body.data.content,/attribuée/);
+ assert.equal(await readCustomerKey(store,buyer),'TEST-KEY-123');
+});
