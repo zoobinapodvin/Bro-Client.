@@ -38,7 +38,7 @@ export default async function handler(req,res) {
       if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();
       return res.json(await reconcileExpiredRoles(bucket));
     }
-    if(path==='/auth/discord'&&req.method==='POST')return startDiscord(res);
+    if(path==='/auth/discord'&&req.method==='POST')return startDiscord(res,new URLSearchParams(payload.toString()).get('return_to'));
     if(path==='/auth/exchange'&&req.method==='POST')return await exchange(req,res,JSON.parse(payload.toString()));
 
     if(/^\/media\/[a-f0-9-]{36}$/.test(path)&&req.method==='GET'){
@@ -89,6 +89,8 @@ export default async function handler(req,res) {
       
       const {site:config}=await site();const plan=config.plans.find(p=>path==='/checkout/'+p.id);
       if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
+      const paymentsReady=!!(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID&&billingEnv.WHOP_WEBHOOK_SECRET);
+      if(!user&&paymentsReady&&botConfigured())return res.redirect(302,'/auth/login?return_to='+encodeURIComponent(path));
       return res.redirect(302,user ? await createCheckout(billingEnv,user.id,user.discordId,plan,origin) : plan.checkoutUrl);
     }
     return res.status(404).end();
