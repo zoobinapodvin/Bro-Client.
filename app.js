@@ -41,6 +41,9 @@ function render(){
     const card=block('article',undefined,'plan '+plan.id);
     const row=block('div',undefined,'plan-top');
     row.setAttribute('aria-hidden','true');
+    // Reuse the configured Rob Run artwork without another network asset.
+    const gameArtwork=asset(c.heroImage);
+    if(gameArtwork)row.style.setProperty('--bro-game-art','url('+JSON.stringify(gameArtwork)+')');
     row.append(block('span','BRO.','pass-mark'),block('span',plan.duration,'pass-duration'));
     const price=block('div',undefined,'amount');
     price.append(block('strong',new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(plan.price)+' €'),block('small','paiement unique'));
@@ -60,8 +63,9 @@ async function checkout(plan) {
     body.append(button('Revenir aux offres',()=>modal.close()));
     return;
   }
-  // Always refresh the server-backed session before starting a purchase.
-  await loadUser();
+  // A verified, already-loaded Discord session can navigate immediately.
+  // Refresh only when session state is missing or uncertain.
+  if(!accountReady||!user?.discordLinked)await loadUser();
   if(!accountReady){
     openDialog('Connexion indisponible');
     body.append(block('p','Impossible de vérifier ta session Discord pour le moment. Réessaie avant de payer.'));
