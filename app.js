@@ -210,7 +210,7 @@ async function account(){
     }else if(tab==='orders'){
       const header=block('div',undefined,'portal-orders-heading');
       header.append(block('strong','Historique des achats'));
-      header.append(smallButton('Actualiser',()=>refresh(true),'btn client-button-primary'));
+      header.append(smallButton('Actualiser mes achats',()=>refresh(true),'btn client-button-primary'));
       viewport.append(header);
       if(!purchases.length){
         viewport.append(block('p','Ton historique sera affiché après un achat associé à ton compte.','client-quiet'));
