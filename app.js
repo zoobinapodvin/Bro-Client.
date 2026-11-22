@@ -406,6 +406,13 @@ async function loadUser(){try{const response=await fetch('/api/me',{cache:'no-st
 document.querySelectorAll('i[data-icon]').forEach(el=>{el.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+paths[el.dataset.icon]+'</svg>';});
 $('.close').onclick=()=>modal.close();modal.addEventListener('click',e=>{if(e.target===modal){const r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)modal.close();}});
 document.querySelectorAll('[data-account]').forEach(el=>el.onclick=account);
+if(new URLSearchParams(location.search).get('checkout_error')==='unavailable'){
+  history.replaceState(null,'',location.pathname+location.hash);
+  openDialog('Paiement indisponible');
+  body.append(block('p','Ton compte Discord est bien connecté, mais Whop ne permet pas encore de préparer un paiement associé à ton compte. Aucun paiement n’a été effectué.'));
+  body.append(button('Revenir aux offres',()=>modal.close(),'btn client-button-primary'));
+}
+
 const menu=$('nav');const hamburger=$('.hamb');hamburger.onclick=()=>{const show=menu.classList.toggle('open');hamburger.setAttribute('aria-expanded',String(show));};
 menu.querySelectorAll('a').forEach(el=>el.onclick=()=>{menu.classList.remove('open');hamburger.setAttribute('aria-expanded','false');});
 const sections=Array.from(menu.querySelectorAll('a[href^="#"]')).map(a=>[a,document.getElementById(a.hash.slice(1))]).filter(([,section])=>section);
