@@ -240,3 +240,28 @@ if(gallery){
   catch{site=await(await fetch('/defaults.json')).json();}
   render();await session;if(location.hash==='#compte')account();
 })();
+
+
+/* Community stats are approximate and fetched from a public same-origin API, never from client-side bot secrets. */
+const discordCounter=document.querySelector('[data-discord-community]');
+async function refreshDiscordCounter(){
+  if(!discordCounter)return;
+  try{
+    const response=await fetch('/api/discord/community',{cache:'no-cache'});
+    if(!response.ok)throw Error('Unavailable');
+    const result=await response.json();
+    if(!result.available||!Number.isSafeInteger(result.members)||result.members<0||
+      !Number.isSafeInteger(result.online)||result.online<0||result.online>result.members)throw Error('Invalid stats');
+    discordCounter.querySelector('[data-discord-online]').textContent=result.online.toLocaleString('fr-FR');
+    discordCounter.querySelector('[data-discord-total]').textContent=result.members.toLocaleString('fr-FR');
+    discordCounter.setAttribute('aria-label',
+      'Rejoindre le serveur Discord Bro Client. Environ '+result.online+' membres en ligne sur '+result.members+' membres.');
+    discordCounter.title='Rejoindre le Discord Bro Client · Statistiques approximatives';
+  }catch{
+    discordCounter.setAttribute('aria-label','Rejoindre le serveur Discord Bro Client. Statistiques indisponibles.');
+  }
+}
+if(discordCounter){
+  refreshDiscordCounter();
+  setInterval(()=>{if(document.visibilityState==='visible')refreshDiscordCounter();},120000);
+}
