@@ -166,9 +166,16 @@ export default async function handler(req,res) {
       
       const {site:config}=await site();const plan=config.plans.find(p=>path==='/checkout/'+p.id);
       if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
-      const paymentsReady=!!(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID&&billingEnv.WHOP_WEBHOOK_SECRET);
-      if(!user&&paymentsReady)return res.redirect(302,'/auth/login?return_to='+encodeURIComponent(path));
-      return res.redirect(302,user ? await createCheckout(billingEnv,user,plan,origin) : plan.checkoutUrl);
+      // Guest checkout is always permitted. Whop remains the payment authority.
+      // An authenticated buyer gets an attributed checkout when supported by Whop;
+      // an API failure must never prevent access to the official existing checkout.
+      if(!user)return res.redirect(302,plan.checkoutUrl);
+      try {
+        return res.redirect(302,await createCheckout(billingEnv,user,plan,origin));
+      } catch(error) {
+        console.error('Attributed checkout failed; using official Whop checkout',plan.id,error?.name);
+        return res.redirect(302,plan.checkoutUrl);
+      }
     }
     return res.status(404).end();
   } catch(e){if(e instanceof RangeError)return res.status(413).end();if(e instanceof SyntaxError)return res.status(400).end();console.error('Bro Client request failed',path,e.name);return res.status(503).json({error:'Service momentanément indisponible.'});}
