@@ -412,7 +412,83 @@ header{box-shadow:0 1px 0 #b4c8e009}
 @media(max-width:360px){.offers .plan{column-gap:6px}.offers .plan-top{aspect-ratio:16/7}.offers .amount strong{font-size:1.55rem}}
 @media(prefers-reduced-motion:reduce){.offers .plan,.offers .plan-button{transition:none!important;transform:none!important}}
 
-/* Rob Run supplied artwork: subtle under metallic pass treatment, desktop and mobile */
-.offers .plan-top::before{background-image:linear-gradient(90deg,rgba(19,29,43,.54),rgba(24,39,55,.44)),url("data:image/jpeg;base64,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");background-position:center center;background-size:cover;opacity:.30;filter:saturate(.72) contrast(.9)}
-.offers .plan-top::after{background:repeating-radial-gradient(ellipse at 15% 40%,transparent 0 10px,#e0efff19 11px,transparent 12px 18px),linear-gradient(160deg,#ffffff2b,transparent 42%,#050c1745)}
-@media(max-width:600px){.offers .plan-top::before{background-position:center 53%;opacity:.28}}
+/* Rob Run real artwork — real static asset, metallic styling preserved.
+   Key fix: pseudo-elements must be ABOVE the opaque card surface, not negative z-index. */
+.offers .plan,.offers .plan.life{
+  isolation:isolate;
+  position:relative;
+}
+.offers .plan::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  border-radius:inherit;
+  pointer-events:none;
+  background:url("/assets/robrun.jpg") center 43% / cover no-repeat;
+  opacity:.075;
+  filter:grayscale(.25) saturate(.65);
+}
+.offers .plan > *{
+  position:relative;
+  z-index:1;
+}
+.offers .plan-top{
+  isolation:isolate;
+  position:relative;
+  overflow:hidden;
+  background-color:#34475d;
+}
+.offers .plan-top::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  background-image:
+    linear-gradient(90deg,rgba(15,28,43,.52),rgba(20,33,49,.44)),
+    url("/assets/robrun.jpg");
+  background-size:cover,cover;
+  background-position:center,center 48%;
+  background-repeat:no-repeat;
+  opacity:.67;
+  transform:none;
+  filter:saturate(.72) contrast(.96);
+}
+.offers .plan-top::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:1;
+  pointer-events:none;
+  background:
+    repeating-radial-gradient(ellipse at 15% 42%,
+      transparent 0 10px,rgba(222,237,255,.11) 11px,transparent 12px 18px),
+    linear-gradient(150deg,rgba(246,250,255,.18),transparent 47%,rgba(8,17,31,.28));
+  opacity:.72;
+}
+.offers .pass-mark,.offers .pass-duration{
+  position:relative;
+  z-index:2;
+}
+.offers .plan .plan-button{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:0;
+  text-align:center;
+  font-weight:700;
+  letter-spacing:.005em;
+}
+.offers .plan .plan-button::after{
+  content:none!important;
+  display:none!important;
+}
+@media(max-width:600px){
+  .offers .plan-top::before{background-position:center,center 45%;opacity:.67}
+  .offers .plan::before{opacity:.06}
+  .offers .plan .plan-button{min-height:47px}
+}
+@media(prefers-reduced-motion:reduce){
+  .offers .plan,.offers .plan-button{transition:none!important;transform:none!important}
+}
