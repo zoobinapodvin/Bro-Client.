@@ -49,7 +49,7 @@ function render(){
   $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');el.append(block('summary',c['q'+i]),block('p',c['a'+i]));return el;}));
 }
 function openDialog(title) {
-  modal.classList.remove('editing','client-portal');body.classList.remove('client-portal-body');body.replaceChildren();
+  modal.classList.remove('editing','client-portal','client-portal-compact');body.classList.remove('client-portal-body');body.replaceChildren();
   const heading=block('h2',title);heading.id='dialogTitle';body.append(heading);modal.setAttribute('aria-labelledby','dialogTitle');
   if(!modal.open)modal.showModal();modal.scrollTop=0;
 }
@@ -67,182 +67,221 @@ function discordButton(text,href,cls='btn discord-connect'){
   el.prepend(icon);return el;
 }
 async function account(){
-  openDialog('Espace client');
-  modal.classList.add('client-portal');
+  openDialog('Mon espace BRO.');
+  modal.classList.add('client-portal','client-portal-compact');
   body.classList.add('client-portal-body');
-  const hero=block('div',undefined,'client-hero');
-  const eyebrow=block('span','BRO CLIENT / ESPACE PRIVÉ','client-eyebrow');
-  const info=block('div',undefined,'client-hero-copy');
-  info.append(eyebrow,block('h3',user?'Bienvenue dans ton espace.':'Un espace, tous tes accès.'));
-  const desc=block('p',user?'Achats, téléchargements et accès Discord réunis au même endroit.':'Connecte Discord pour retrouver tes services et tes achats vérifiés.');
-  info.append(desc);hero.append(info);
-  body.append(hero);
+  const notice=block('p','','client-status-message');
+  notice.setAttribute('role','status');
   if(!accountReady){
-    body.append(block('p','Connexion à ton espace indisponible.','client-note'),button('Réessayer',async()=>{await loadUser();account();},'btn ghost'));return;
+    body.append(block('p','Impossible de récupérer ta session.','client-quiet'),
+      button('Réessayer',async()=>{await loadUser();account();},'btn client-button-primary'));
+    return;
   }
   if(!user){
-    const loginCard=block('section',undefined,'client-signin');
-    loginCard.append(block('h3','Connexion sécurisée avec Discord'),block('p','Aucun mot de passe Bro Client à créer. La connexion passe par Discord et Supabase.'));
-    loginCard.append(discordButton('Continuer avec Discord','/auth/discord'));
-    body.append(loginCard);return;
+    const welcome=block('section',undefined,'portal-welcome');
+    welcome.append(block('span','BRO CLIENT · ESPACE PRIVÉ','client-kicker'),
+      block('h3','Retrouve tes accès en un seul endroit.'),
+      block('p','Connecte ton compte Discord pour consulter tes achats et tes téléchargements.'));
+    welcome.append(discordButton('Continuer avec Discord','/auth/discord'));
+    body.append(welcome);
+    return;
   }
-  const identity=block('div',undefined,'client-identity');
-  const identityIcon=block('span',undefined,'discord-brand-icon');identityIcon.innerHTML=discordMark;
-  const who=block('div',undefined,'client-who');
-  who.append(block('strong','Discord connecté'),block('small',user.email||'Compte associé','account-email'));
-  identity.append(identityIcon,who,block('span','Session active','client-online-badge'));
-  body.append(identity);
-
-  const actions=block('div',undefined,'client-toolbar');
-  const refresh=button('Actualiser mes achats',()=>updateOverview(true),'btn client-button-primary');
-  const sync=button('Synchroniser mon rôle',async()=>{
-    sync.disabled=true;notice.textContent='Synchronisation Discord en cours…';
-    try{
-      const response=await fetch('/api/discord/sync',{method:'POST'});
-      const result=await response.json();
-      const labels={
-        role_granted:'Ton rôle Customer est synchronisé.',
-        role_granted_lifetime:'Tes rôles Customer et Lifetime sont synchronisés.',
-        no_purchase:'Aucun achat Discord vérifié pour le moment.',
-        bot_unconfigured:'Le bot attend ses identifiants de configuration.',
-        not_member:'Rejoins le serveur Discord avant de synchroniser ton rôle.',
-        discord_unavailable:'Discord est momentanément indisponible.',
-        insufficient_permissions:'Le bot doit disposer du droit Gérer les rôles.'
-      };
-      notice.textContent=labels[result.status]||result.error||'Synchronisation indisponible.';
-    }catch{notice.textContent='Synchronisation momentanément indisponible.';}
-    finally{sync.disabled=false;}
-  },'btn ghost');
-  actions.append(refresh,sync);
-  body.append(actions);
-  const notice=block('p','','client-feedback');notice.setAttribute('role','status');body.append(notice);
-  const grid=block('div',undefined,'client-grid');
-  const purchases=block('section',undefined,'client-tile client-purchases');
-  purchases.append(block('span','01 / ACHATS','client-kicker'),block('h3','Mes achats'),block('p','Retrouve les passes associés à ton compte Discord.','client-subtitle'));
-  const purchaseBody=block('div',undefined,'client-purchase-results');
-  purchases.append(purchaseBody);
-  const delivery=block('section',undefined,'client-tile client-delivery');
-  delivery.append(block('span','02 / TÉLÉCHARGEMENTS','client-kicker'),block('h3','Mon Bro Client'));
-  const deliveryBody=block('div',undefined,'client-delivery-results');
-  delivery.append(deliveryBody);
-  grid.append(purchases,delivery);
-
-  const keyTile=block('section',undefined,'client-tile client-key-tile');
-  keyTile.append(block('span','03 / ACTIVATION','client-kicker'),block('h3','Clé d’activation'));
-  const keyBody=block('div',undefined,'client-key-results');
-  keyTile.append(keyBody);
-  const resources=block('section',undefined,'client-tile client-resources');
-  resources.append(block('span','04 / RESSOURCES','client-kicker'),block('h3','Centre d’aide'));
-  resources.append(block('p','Consulte les guides et contacte le support officiel si nécessaire.','client-subtitle'));
-  resources.append(button('Consulter les guides',()=>guides(false),'btn ghost'));
-  const guild=discordButton('Rejoindre le serveur','https://discord.gg/uRQyKBhhgA','btn client-discord-link');
-  guild.target='_blank';guild.rel='noopener noreferrer';
-  resources.append(guild);
-  grid.append(keyTile,resources);
-  body.append(grid);
-
-  const receipts=block('details',undefined,'client-receipts');
-  const receiptTitle=block('summary','Factures et historique Whop');
-  const receiptList=block('div');
-  receipts.append(receiptTitle,receiptList);
-  const portal=link('Consulter les achats sur Whop','https://whop.com/@me/settings/orders/');
-  portal.target='_blank';portal.rel='noopener noreferrer';receipts.append(portal);
-  receipts.addEventListener('toggle',()=>{if(receipts.open&&!receiptList.childElementCount)loadInvoices(receiptList);});
-  body.append(receipts);
-  if(user.admin){
-    const admin=block('section',undefined,'client-admin');
-    admin.append(block('h3','Administration Bro Client'),block('p','Importer la version exacte du programme validé, enregistrer les commandes et administrer le site.'));
-    const row=block('div',undefined,'client-admin-actions');
-    row.append(button('Administrer le site',editor,'btn ghost'),button('Gérer les guides',()=>guides(true),'btn ghost'));
-    const register=button('Installer /bro et /startkey',async()=>{
-      register.disabled=true;notice.textContent='Enregistrement des commandes Discord…';
-      try{
-        const result=await(await fetch('/api/discord/register',{method:'POST'})).json();
-        notice.textContent=result.status==='registered'?'Commandes installées dans Discord.':'La configuration du bot doit être terminée.';
-      }catch{notice.textContent='Impossible d’installer les commandes actuellement.';}
-      finally{register.disabled=false;}
-    },'btn ghost');
-    row.append(register);
-    const upload=block('input');upload.type='file';upload.accept='.exe,application/octet-stream';upload.setAttribute('aria-label','Importer la version de BroClient.exe');
-    const publish=button('Importer BroClient.exe',async()=>{
-      const file=upload.files?.[0];if(!file){notice.textContent='Sélectionne le fichier BroClient.exe.';return;}
-      publish.disabled=true;notice.textContent='Vérification et transfert privé du fichier…';
-      try{
-        const response=await fetch('/api/admin/release',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:file});
-        const result=await response.json();
-        if(!response.ok||result.status!=='stored')throw Error('Fichier différent de la version autorisée, ou stockage indisponible.');
-        notice.textContent='BroClient.exe enregistré dans le stockage privé.';
-        await updateOverview(false);
-      }catch(error){notice.textContent=error.message;}
-      finally{publish.disabled=false;}
-    },'btn client-button-primary');
-    admin.append(row,upload,publish);body.append(admin);
+  const profile=block('div',undefined,'portal-profile');
+  if(user.discordAvatar){
+    const avatar=block('img',undefined,'portal-avatar');
+    avatar.src=user.discordAvatar;
+    avatar.alt='';
+    avatar.referrerPolicy='no-referrer';
+    avatar.onerror=()=>{const fallback=block('span',undefined,'portal-avatar-placeholder');fallback.innerHTML=discordMark;avatar.replaceWith(fallback);};
+    profile.append(avatar);
+  }else{
+    const fallback=block('span',undefined,'portal-avatar-placeholder');fallback.innerHTML=discordMark;profile.append(fallback);
   }
-  const footer=block('div',undefined,'client-footer');
-  footer.append(block('span','Ton compte reste associé à tes achats après déconnexion.','client-footer-note'));
-  const disconnect=button('Déconnecter Discord',async()=>{
-    disconnect.disabled=true;
+  const identity=block('div',undefined,'portal-identity');
+  identity.append(block('small','CONNECTÉ AVEC DISCORD'),block('strong',user.discordUsername||'Compte Discord'));
+  profile.append(identity,block('span','Connecté','portal-connected'));
+  body.append(profile);
+
+  const tabs=block('div',undefined,'portal-tabs');tabs.setAttribute('role','tablist');
+  const viewport=block('section',undefined,'portal-view');viewport.setAttribute('aria-live','polite');
+  const tabButtons=new Map();
+  let purchases=[],overview=null,current='access';
+  for(const [id,label] of [['access','Mes accès'],['orders','Mes achats'],['help','Aide'],...(user.admin?[['admin','Administration']]:[])]){
+    const item=button(label,()=>show(id),'portal-tab');
+    item.setAttribute('role','tab');item.setAttribute('aria-selected','false');
+    tabButtons.set(id,item);tabs.append(item);
+  }
+  body.append(tabs,viewport,notice);
+
+  const footer=block('div',undefined,'portal-footer');
+  footer.append(block('span','BRO. / Espace client','portal-footer-brand'));
+  const logout=button('Délier Discord',async()=>{
+    logout.disabled=true;
     try{
-      const response=await fetch('/auth/unlink',{method:'POST'});
-      if(!response.ok)throw Error();
+      const res=await fetch('/auth/unlink',{method:'POST'});
+      if(!res.ok)throw Error();
       user=null;account();
-    }catch{notice.textContent='Impossible de déconnecter la session. Réessaie.';disconnect.disabled=false;}
-  },'btn client-disconnect');
-  const miniIcon=block('span',undefined,'discord-brand-icon');miniIcon.innerHTML=discordMark;
-  disconnect.prepend(miniIcon);footer.append(disconnect);body.append(footer);
+    }catch{notice.textContent='Déconnexion indisponible. Réessaie.';logout.disabled=false;}
+  },'portal-logout');
+  const discordLogo=block('span',undefined,'discord-brand-icon');discordLogo.innerHTML=discordMark;
+  logout.prepend(discordLogo);footer.append(logout);body.append(footer);
 
-  async function updateOverview(manual){
-    refresh.disabled=true;
-    if(manual)notice.textContent='Actualisation des achats vérifiés…';
+  const status=(text)=>{notice.textContent=text||'';};
+  async function refresh(manual=false){
     try{
-      const response=await fetch('/api/account/overview',{cache:'no-store'});
-      const data=await response.json();
-      if(!response.ok)throw Error(data.error||'Service indisponible.');
-      purchaseBody.replaceChildren();
-      deliveryBody.replaceChildren();
-      keyBody.replaceChildren();
-      if(data.purchases?.length){
-        for(const purchase of data.purchases){
-          const row=block('div',undefined,'client-pass');
-          const labels={day:'Pass Jour',week:'Pass Semaine',month:'Pass Mois',life:'Pass Lifetime'};
-          const name=block('strong',labels[purchase.planId]||'Pass Bro Client');
-          const active=block('span',purchase.active?'Actif':'Expiré',purchase.active?'client-tag-active':'client-tag-expired');
-          row.append(name,active);
-          if(purchase.expiresAt&&purchase.active)row.append(block('small','Jusqu’au '+new Date(purchase.expiresAt).toLocaleDateString('fr-FR')));
-          purchaseBody.append(row);
-        }
-      }else purchaseBody.append(block('p','Aucun achat associé à ce compte pour le moment.','client-muted'));
-      if(!data.whopConfigured)purchaseBody.append(block('p','Synchronisation automatique Whop en attente de configuration.','client-muted'));
-      if(data.active){
-        if(data.downloadAvailable){
-          const download=link('Télécharger BroClient.exe','/api/account/download','btn client-button-primary');
-          download.setAttribute('download','BroClient.exe');deliveryBody.append(download);
-        }else deliveryBody.append(block('p','Le programme sera disponible dans ton espace après sa publication.','client-muted'));
-        if(data.keyAvailable){
-          const copy=button('Copier ma clé',async()=>{
-            try{
-              const response=await fetch('/api/account/key',{cache:'no-store'});
-              if(!response.ok)throw Error();
-              const {key}=await response.json();
-              await navigator.clipboard.writeText(key);
-              notice.textContent='Clé copiée dans le presse-papiers.';
-            }catch{notice.textContent='La copie a échoué. Utilise le téléchargement texte.';}
-          },'btn client-button-primary');
-          const txt=link('Télécharger la clé (.txt)','/api/account/key.txt','btn ghost');
-          keyBody.append(copy,txt);
-        }else{
-          keyBody.append(block('p','Tu as déjà acheté ? Ouvre un ticket support pour récupérer ta clé.','client-muted'));
-          const support=discordButton('Contacter le support','https://discord.gg/uRQyKBhhgA','btn ghost');
-          support.target='_blank';support.rel='noopener noreferrer';keyBody.append(support);
-        }
-      }else deliveryBody.append(block('p','Disponible après la confirmation d’un achat actif.','client-muted'));
-      if(manual)notice.textContent='Achats vérifiés actualisés. Les achats effectués sans connexion Discord nécessitent une vérification par le support.';
-    }catch(error){
-      purchaseBody.replaceChildren(block('p','Impossible de consulter les achats pour le moment.','client-muted'));
-      notice.textContent=error.message;
-    }finally{refresh.disabled=false;}
+      if(manual)status('Actualisation des achats…');
+      const result=await fetch('/api/account/overview',{cache:'no-store'});
+      if(!result.ok)throw Error();
+      overview=await result.json();
+      purchases=overview.purchases||[];
+      show(current);
+      if(manual)status('Achats actualisés.');
+    }catch{
+      if(manual)status('Impossible de récupérer les achats actuellement.');
+    }
   }
-  updateOverview(false);
+  function smallButton(label,callback,cls='btn ghost'){
+    return button(label,callback,cls+' portal-action');
+  }
+  function show(tab){
+    current=tab;viewport.replaceChildren();
+    for(const [id,el] of tabButtons){el.classList.toggle('active',id===tab);el.setAttribute('aria-selected',String(id===tab));}
+    if(tab==='access'){
+      if(!overview?.active){
+        const empty=block('div',undefined,'portal-empty');
+        const text=block('div',undefined,'portal-empty-text');
+        text.append(block('span','MES ACCÈS','client-kicker'),block('h3','Aucun pass actif'),block('p','Tes accès seront disponibles après ton premier achat.'));
+        empty.append(text,link('Découvrir les offres','/offres','btn client-button-primary portal-action'));
+        viewport.append(empty);
+        return;
+      }
+      const active=purchases.filter(p=>p.active);
+      const last=active.find(p=>p.planId==='life')||active[0];
+      const display={day:'Pass Jour',week:'Pass Semaine',month:'Pass Mois',life:'Pass Lifetime'};
+      const pass=block('div',undefined,'portal-pass-line');
+      pass.append(block('span','PASS ACTIF','client-kicker'),block('strong',display[last?.planId]||'Bro Client'),
+        block('span',last?.planId==='life'?'Accès à vie':'Actif','client-tag-active'));
+      viewport.append(pass);
+      const files=block('div',undefined,'portal-download-row');
+      files.append(block('strong','BroClient.exe'));
+      if(overview.downloadAvailable){
+        const download=link('Télécharger','/api/account/download','btn client-button-primary portal-action');
+        download.setAttribute('download','BroClient.exe');files.append(download);
+      }else files.append(block('span','Version en préparation','client-quiet'));
+      viewport.append(files);
+      if(overview.keyAvailable){
+        const keyRow=block('div',undefined,'portal-key-row');
+        keyRow.append(block('span','MA CLÉ','client-kicker'));
+        const input=block('input');input.type='text';input.readOnly=true;input.value='•••• •••• •••• ••••';
+        input.setAttribute('aria-label','Clé d’activation');
+        input.className='portal-key-input';
+        keyRow.append(input);
+        const actions=block('div',undefined,'portal-key-actions');
+        const reveal=smallButton('Afficher',async()=>{
+          try{
+            const r=await fetch('/api/account/key',{cache:'no-store'});
+            if(!r.ok)throw Error();const data=await r.json();input.value=data.key;input.title=data.key;
+          }catch{status('Clé momentanément indisponible.');}
+        });
+        const copy=smallButton('Copier',async()=>{
+          try{
+            const r=await fetch('/api/account/key',{cache:'no-store'});
+            if(!r.ok)throw Error();const data=await r.json();
+            await navigator.clipboard.writeText(data.key);status('Clé copiée.');
+          }catch{status('Copie indisponible.');}
+        },'btn client-button-primary');
+        actions.append(reveal,copy,link('.txt','/api/account/key.txt','btn ghost portal-action'));
+        keyRow.append(actions);viewport.append(keyRow);
+      }else{
+        const missing=block('div',undefined,'portal-missing-key');
+        missing.append(block('span','Clé non attribuée. Ouvre un ticket support pour la récupérer.'),
+          link('Ouvrir un ticket','https://discord.gg/uRQyKBhhgA','portal-small-link'));
+        viewport.append(missing);
+      }
+      viewport.append(smallButton('Synchroniser mon rôle',async()=>{
+        status('Synchronisation des rôles…');
+        try{
+          const response=await fetch('/api/discord/sync',{method:'POST'});
+          const data=await response.json();
+          status(data.status==='role_granted_lifetime'?'Rôles Customer et Lifetime synchronisés.':
+            data.status==='role_granted'?'Rôle Customer synchronisé.':'Synchronisation effectuée : '+(data.status||'non disponible'));
+        }catch{status('Synchronisation indisponible.');}
+      }));
+    }else if(tab==='orders'){
+      const header=block('div',undefined,'portal-orders-heading');
+      header.append(block('strong','Historique des achats'));
+      header.append(smallButton('Actualiser',()=>refresh(true),'btn client-button-primary'));
+      viewport.append(header);
+      if(!purchases.length){
+        viewport.append(block('p','Ton historique sera affiché après un achat associé à ton compte.','client-quiet'));
+      }else{
+        for(const item of purchases.slice(0,3)){
+          const row=block('div',undefined,'portal-order-item');
+          const names={day:'Jour',week:'Semaine',month:'Mois',life:'Lifetime'};
+          row.append(block('strong','Bro Client · '+(names[item.planId]||'Pass')),
+            block('span',item.active?'Actif':'Expiré',item.active?'client-tag-active':'client-tag-expired'));
+          viewport.append(row);
+        }
+      }
+      const ordersLink=link('Ouvrir mes factures Whop','https://whop.com/@me/settings/orders/','portal-small-link');
+      ordersLink.target='_blank';ordersLink.rel='noopener noreferrer';viewport.append(ordersLink);
+    }else if(tab==='help'){
+      viewport.append(block('h3','Besoin d’aide ?'),block('p','Guides, téléchargements et assistance sur le serveur Bro Client.','client-quiet'));
+      const links=block('div',undefined,'portal-help-actions');
+      links.append(smallButton('Consulter les guides',()=>guides(false)));
+      const guild=discordButton('Discord et tickets','https://discord.gg/uRQyKBhhgA','btn client-discord-link portal-action');
+      guild.target='_blank';guild.rel='noopener noreferrer';links.append(guild);
+      viewport.append(links);
+      const choice=block('label',undefined,'portal-consent-label');
+      const checkbox=block('input');checkbox.type='checkbox';
+      choice.append(checkbox,block('span','Afficher mon pseudo et avatar Discord dans les achats récents (facultatif).'));
+      viewport.append(choice);
+      fetch('/api/account/publicity',{cache:'no-store'}).then(r=>r.json()).then(data=>{if(current==='help')checkbox.checked=!!data.showPublic;}).catch(()=>{});
+      checkbox.onchange=async()=>{
+        const checked=checkbox.checked;checkbox.disabled=true;
+        try{
+          const response=await fetch('/api/account/publicity',{method:'POST',headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({showPublic:checked})});
+          if(!response.ok)throw Error();
+          status(checked?'Pseudo affichable pour les futurs achats confirmés.':'Ton pseudo ne sera plus affiché dans les achats récents.');
+        }catch{checkbox.checked=!checked;status('Préférence indisponible.');}
+        finally{checkbox.disabled=false;}
+      };
+    }else if(tab==='admin'&&user.admin){
+      const area=block('div',undefined,'portal-admin-tools');
+      area.append(block('h3','Gestion Bro Client'));
+      const actions=block('div',undefined,'portal-admin-actions');
+      actions.append(smallButton('Site',editor),smallButton('Guides',()=>guides(true)));
+      actions.append(smallButton('Installer /startkey',async()=>{
+        try{const response=await fetch('/api/discord/register',{method:'POST'});
+          const data=await response.json();status(data.status==='registered'?'Commandes installées.':'Bot non configuré.');}
+        catch{status('Installation indisponible.');}
+      }));
+      actions.append(smallButton('Importer achats Whop',async()=>{
+        status('Lecture des paiements Whop vérifiés…');
+        try{
+          const response=await fetch('/api/admin/activity/backfill',{method:'POST'});
+          const data=await response.json();if(!response.ok)throw Error(data.error||'Whop indisponible');
+          status(data.imported+' achat(s) historique(s) ajoutés au tableau.');
+        }catch(error){status(error.message);}
+      }));
+      area.append(actions);
+      const upload=block('input');upload.type='file';upload.accept='.exe,application/octet-stream';
+      upload.setAttribute('aria-label','Importer le programme autorisé');
+      area.append(upload);
+      area.append(smallButton('Publier BroClient.exe',async()=>{
+        if(!upload.files?.[0]){status('Sélectionne le fichier autorisé.');return;}
+        try{
+          status('Import privé en cours…');
+          const response=await fetch('/api/admin/release',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:upload.files[0]});
+          if(!response.ok)throw Error();status('Programme publié.');await refresh();
+        }catch{status('Import refusé ou indisponible.');}
+      },'btn client-button-primary'));
+      viewport.append(area);
+    }
+  }
+  show('access');
+  refresh();
 }
 async function loadInvoices(target,cursor) {
   const note=block('p','Chargement des paiements…');target.append(note);
