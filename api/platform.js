@@ -168,12 +168,12 @@ export default async function handler(req,res) {
       if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
       // A paid checkout must have a verified Discord session. Never fall back
       // to an anonymous Whop plan: that would silently break account linking.
-      if(!user?.discordId)return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent(path));
+      if(!user?.discordId)return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent('/offres'));
       try{
         return res.redirect(302,await createCheckout(billingEnv,user,plan,origin));
       }catch(error){
         console.error('Discord-attributed checkout unavailable',plan.id,error?.name);
-        return res.status(503).json({error:'Le paiement lié à Discord est temporairement indisponible. Réessaie dans quelques instants.'});
+        return res.redirect(303,'/offres?checkout_error=unavailable');
       }
     }
     return res.status(404).end();
