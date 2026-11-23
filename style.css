@@ -751,3 +751,13 @@ header{box-shadow:0 1px 0 #b4c8e009}
  .patchnotes-admin-heading{align-items:flex-start;flex-direction:column}
 }
 @media(prefers-reduced-motion:reduce){.patchnote-top-link,.patchnotes-entry{transition:none!important;transform:none!important}}
+
+.patchnotes-notify-admin{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;
+ gap:11px 20px;margin-top:28px;padding:20px;border:1px solid #435b74;border-radius:13px;
+ background:linear-gradient(140deg,#223348,#172636)}
+.patchnotes-notify-admin strong{font-size:.91rem;color:#e7f0f9}
+.patchnotes-notify-admin p{margin:7px 0 0;font-size:.77rem;line-height:1.6;color:#afc0d3}
+.patchnotes-notify-admin button{white-space:nowrap;min-height:42px}
+#patchnotesReplayStatus{grid-column:1/-1;margin:0}
+@media(max-width:700px){.patchnotes-notify-admin{grid-template-columns:1fr;padding:15px}
+ .patchnotes-notify-admin button{width:100%}}
