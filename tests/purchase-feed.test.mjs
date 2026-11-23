@@ -56,6 +56,20 @@ test('historical Whop import omits forced API version and stores real payments',
  assert.equal(recent[0].amount,6);
  assert.equal(recent[0].name,'Client BRO');
 });
+test('Whop plan ID and company_id variations import the matching pass',async t=>{
+ const original=globalThis.fetch;
+ t.after(()=>{globalThis.fetch=original;});
+ globalThis.fetch=async()=>Response.json({
+  data:[payment({id:'pay_planOnly',product:null,plan:{id:'plan_kPcl5mzGmRq2Q'},company:null,company_id:company,total:15})],
+  page_info:{has_next_page:false}
+ });
+ const b=bucket();
+ const result=await backfillWhopHistory(b,{apiKey:'test-not-real',accountId:company});
+ assert.equal(result.imported,1);
+ const recent=await recentPurchases(b);
+ assert.equal(recent[0].plan,'Pass Semaine');
+ assert.equal(recent[0].amount,15);
+});
 test('signed direct Whop payment succeeds without a Bro order and never grants Discord access',async t=>{
  const original=globalThis.fetch;
  const privateNotice=process.env.BRO_DISCORD_WEBHOOK_DAY;
