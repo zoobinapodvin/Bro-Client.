@@ -138,11 +138,33 @@ test('new purchase card interface remains accessible and adaptive on mobile',()=
  const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
  assert.match(html,/class="purchase-board-list"[^>]*aria-live="polite"/);
- assert.match(html,/data-account>Mon espace/);
+ assert.match(html,/class="mobile-dock"/);
+ assert.match(html,/data-account/);
  assert.match(js,/purchase-card-buyer/);
  assert.match(js,/purchase-card-avatar/);
  assert.match(js,/profileVisibilitySetting/);
  assert.match(js,/setInterval\(\(\)=>\{if\(document.visibilityState==='visible'\)refreshRecentBoard\(\);\},15000\)/);
  assert.match(css,/\.purchase-card\{/);
- assert.match(css,/@media\(max-width:660px\)/);
+ assert.match(css,/@media\(max-width:680px\)/);
+});
+
+test('public Discord display strips legacy discriminator without exposing addresses',()=>{
+ const p=payment('pay_DISCRIMINATOR','2026-11-23T02:00:00.000Z');
+ const publicRecord=normalizePayment(p,'day',{visible:true,username:'n7umber#0',avatar:'https://cdn.discordapp.com/avatars/1574096900000000001/test.png'});
+ assert.equal(publicRecord.name,'n7umber');
+ assert.ok(publicRecord.avatar?.startsWith('https://cdn.discordapp.com/avatars/'));
+ assert.equal(normalizePayment(p,'day',{visible:false,username:'n7umber#0'}).name,'Client BRO');
+ assert.equal(normalizePayment(p,'day',{visible:true,username:'user@example.com'}).name,'Client BRO');
+});
+test('homepage has a discreet, compact animated feed without repeated sales copy',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.doesNotMatch(html,/Les 5 dernières commandes BRO CLIENT, vérifiées par Whop/);
+ assert.doesNotMatch(html,/class="purchase-board-foot"/);
+ assert.match(css,/width:min\(800px,89%\)/);
+ assert.match(css,/purchase-metal-sheen/);
+ assert.match(css,/@media\(prefers-reduced-motion:reduce\)/);
+ assert.match(js,/purchase\.name\.replace\(\/#\\d\{1,4\}\$\//);
+ assert.match(js,/purchase-card-new/);
 });

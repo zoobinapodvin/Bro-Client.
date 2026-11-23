@@ -479,90 +479,82 @@ if(discordCounter){
 }
 
 
-/* Homepage: five verified Whop payments, privacy-aware and auto-refreshed. */
+/* Compact verified Whop activity. Never infer purchaser identity from a login alone. */
 const recentBoard=document.getElementById('purchaseBoard');
 const recentIndicator=document.querySelector('.purchase-live-indicator');
 let lastFeedSignature='';
+let lastTopPurchase=null;
 function updateRecentStatus(state){
-  if(!recentIndicator)return;
-  const indicatorState=state==='error'||state==='not_configured'?'error':state==='ok'?'ok':'loading';
-  const captions={ok:'Flux actif',error:'Synchronisation différée',loading:'Synchronisation'};
-  const node=recentIndicator.querySelector('.purchase-live-text');
-  recentIndicator.dataset.state=indicatorState;
-  if(node)node.textContent=captions[indicatorState];
+ if(!recentIndicator)return;
+ const indicatorState=state==='error'||state==='not_configured'?'error':state==='ok'?'ok':'loading';
+ const labels={ok:'À jour',error:'Indisponible',loading:'Chargement'};
+ const label=recentIndicator.querySelector('.purchase-live-text');
+ recentIndicator.dataset.state=indicatorState;
+ if(label)label.textContent=labels[indicatorState];
+ recentIndicator.title=indicatorState==='error'?'Synchronisation temporairement indisponible':'Mise à jour automatique des achats';
 }
 function renderRecentFeed(data){
-  const state=data.sync?.state??'pending';
-  updateRecentStatus(state);
-  const purchases=data.purchases.filter(p=>p&&Number.isFinite(p.amount)&&Number.isFinite(Date.parse(p.date))).slice(0,5);
-  const signature=JSON.stringify([purchases,state]);
-  if(signature===lastFeedSignature)return;
-  lastFeedSignature=signature;
-  if(!purchases.length){
-    const message=state==='ok'
-      ? 'Aucune commande confirmée disponible pour le moment.'
-      : 'Les achats sont momentanément en cours de synchronisation.';
-    recentBoard.replaceChildren(block('p',message,'purchase-board-empty'));
-    return;
-  }
-  const money=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'});
-  const dateFormat=new Intl.DateTimeFormat('fr-FR',{
-    timeZone:'Europe/Paris',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'
-  });
-  const rows=purchases.map((purchase,index)=>{
-    const row=block('article',undefined,'purchase-card');
-    row.setAttribute('role','listitem');
-    const rank=block('span',String(index+1).padStart(2,'0'),'purchase-card-rank');
-    rank.setAttribute('aria-hidden','true');
-    const buyer=block('div',undefined,'purchase-card-buyer');
-    const photo=block('span',undefined,'purchase-card-avatar');
-    photo.setAttribute('aria-hidden','true');
-    const personalized=typeof purchase.name==='string'&&purchase.name!=='Client BRO'&&purchase.name.trim()!=='';
-    if(purchase.avatar&&personalized){
-      const img=block('img');img.src=purchase.avatar;img.alt='';
-      img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';
-      img.onerror=()=>{img.replaceWith(block('span','B.'));};
-      photo.append(img);
-      photo.classList.add('has-photo');
-    }else{
-      photo.append(block('span','B.'));
-    }
-    const buyerInfo=block('div',undefined,'purchase-card-buyer-info');
-    buyerInfo.append(block('strong',personalized?purchase.name:'Membre BRO','purchase-card-username'),
-      block('small',personalized?'Profil Discord':'Profil privé','purchase-card-identity'));
-    buyer.append(photo,buyerInfo);
-    const product=block('div',undefined,'purchase-card-product');
-    product.append(block('span',purchase.plan||'Pass BRO CLIENT','purchase-card-product-name'),
-      block('small','Licence BRO CLIENT','purchase-card-product-caption'));
-    const price=block('div',undefined,'purchase-card-price');
-    price.append(block('strong',money.format(purchase.amount)),
-      block('small','Paiement confirmé'));
-    const when=block('time',dateFormat.format(new Date(purchase.date)),'purchase-card-date');
-    when.dateTime=purchase.date;
-    when.title='Paiement confirmé le '+dateFormat.format(new Date(purchase.date));
-    row.append(rank,buyer,product,price,when);
-    return row;
-  });
-  recentBoard.replaceChildren(...rows);
+ const state=data.sync?.state??'pending';
+ updateRecentStatus(state);
+ const purchases=data.purchases.filter(p=>p&&Number.isFinite(p.amount)&&Number.isFinite(Date.parse(p.date))).slice(0,5);
+ const signature=JSON.stringify([purchases,state]);
+ if(signature===lastFeedSignature)return;
+ lastFeedSignature=signature;
+ if(!purchases.length){
+  recentBoard.replaceChildren(block('p',state==='ok'?'Aucun achat confirmé à afficher.':'Synchronisation des achats en cours.','purchase-board-empty'));
+  return;
+ }
+ const newest=JSON.stringify([purchases[0].date,purchases[0].plan,purchases[0].amount]);
+ const hasNew=lastTopPurchase!==null&&lastTopPurchase!==newest;
+ lastTopPurchase=newest;
+ const currency=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'});
+ const datetime=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',
+   day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+ const rows=purchases.map((purchase,index)=>{
+  const entry=block('div',undefined,'purchase-card');
+  entry.setAttribute('role','listitem');
+  if(hasNew&&index===0)entry.classList.add('purchase-card-new');
+  const buyer=block('div',undefined,'purchase-card-buyer');
+  const photo=block('span',undefined,'purchase-card-avatar');
+  photo.setAttribute('aria-hidden','true');
+  // A Discord profile is public here only after verified association AND opt-in.
+  const personal=typeof purchase.name==='string'&&purchase.name.trim()&&purchase.name!=='Client BRO';
+  const pseudo=personal?purchase.name.replace(/#\d{1,4}$/,'').trim().slice(0,32):'Membre BRO';
+  if(purchase.avatar&&personal){
+   const img=block('img');img.src=purchase.avatar;img.alt='';img.loading='lazy';
+   img.decoding='async';img.referrerPolicy='no-referrer';
+   img.onerror=()=>{img.replaceWith(block('span','B.'));};
+   photo.append(img);photo.classList.add('has-photo');
+  }else photo.append(block('span','B.'));
+  buyer.append(photo,block('strong',pseudo||'Membre BRO','purchase-card-username'));
+  const name=block('span',purchase.plan||'Pass Bro Client','purchase-card-product');
+  const amount=block('strong',currency.format(purchase.amount),'purchase-card-price');
+  const when=block('time',datetime.format(new Date(purchase.date)).replace(',',' ·'),'purchase-card-date');
+  when.dateTime=purchase.date;
+  when.title='Paiement confirmé';
+  entry.append(buyer,name,amount,when);
+  return entry;
+ });
+ recentBoard.replaceChildren(...rows);
 }
 async function refreshRecentBoard(){
-  if(!recentBoard)return;
-  try{
-    const response=await fetch('/api/activity',{cache:'no-store'});
-    if(!response.ok)throw Error('feed_unavailable');
-    const data=await response.json();
-    if(!Array.isArray(data.purchases))throw Error('bad_feed');
-    renderRecentFeed(data);
-  }catch{
-    updateRecentStatus('error');
-    if(!recentBoard.querySelector('.purchase-card')){
-      recentBoard.replaceChildren(block('p','Impossible de récupérer les achats pour le moment.','purchase-board-empty'));
-    }
+ if(!recentBoard)return;
+ try{
+  const response=await fetch('/api/activity',{cache:'no-store'});
+  if(!response.ok)throw Error('feed_unavailable');
+  const data=await response.json();
+  if(!Array.isArray(data.purchases))throw Error('bad_feed');
+  renderRecentFeed(data);
+ }catch{
+  updateRecentStatus('error');
+  if(!recentBoard.querySelector('.purchase-card')){
+   recentBoard.replaceChildren(block('p','Achats indisponibles pour le moment.','purchase-board-empty'));
   }
+ }
 }
 if(recentBoard){
-  recentBoard.setAttribute('role','list');
-  refreshRecentBoard();
-  setInterval(()=>{if(document.visibilityState==='visible')refreshRecentBoard();},15000);
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshRecentBoard();});
+ recentBoard.setAttribute('role','list');
+ refreshRecentBoard();
+ setInterval(()=>{if(document.visibilityState==='visible')refreshRecentBoard();},15000);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshRecentBoard();});
 }

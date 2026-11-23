@@ -577,94 +577,99 @@ header{box-shadow:0 1px 0 #b4c8e009}
 @media(prefers-reduced-motion:reduce){.capability-home a,.capability-card{transition:none!important}}
 
 
-/* BRO. — Premium verified purchases 2026, desktop and responsive */
-.purchase-board{position:relative;isolation:isolate;overflow:hidden;margin-top:clamp(27px,4vw,48px);margin-bottom:clamp(18px,3vw,35px);padding:clamp(19px,2.6vw,32px);
- border:1px solid #41556e;border-radius:23px;background:radial-gradient(ellipse 65% 100% at 0% 0%,#344d682c,transparent 78%),linear-gradient(140deg,#1b2736,#151e2b 75%,#131b26);
- box-shadow:0 24px 62px #040b1929,inset 0 1px #ffffff17}
-.purchase-board::before{content:"";position:absolute;inset:0 0 auto;height:1px;pointer-events:none;
- background:linear-gradient(90deg,transparent,#d3e5ff57 32%,transparent 78%)}
-.purchase-board-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:0 0 23px;padding:0;border:0}
-.purchase-board-intro{min-width:0}.purchase-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:10px;font-weight:850;letter-spacing:.17em;color:#a8c4e1}
-.purchase-eyebrow-line{width:18px;height:2px;display:block;background:#b3d1f0;border-radius:5px}
-.purchase-board-heading h2{font-size:clamp(25px,2.7vw,35px);line-height:1.08;letter-spacing:-.05em;margin:11px 0 7px}
-.purchase-heading-period{color:#b0cbe8}.purchase-board-heading p{color:#aec0d3;font-size:13px;line-height:1.5;margin:0}
-.purchase-board-status{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex:none}
-.purchase-live-indicator{display:inline-flex;gap:9px;align-items:center;min-height:33px;padding:8px 13px;border:1px solid #3c685b;
- border-radius:99px;background:#1b352f;color:#a1e4c6;font-size:11px;font-weight:750;white-space:nowrap}
-.purchase-pulse{width:7px;height:7px;background:#77deb0;box-shadow:0 0 0 4px #70d9a71c;border-radius:50%;flex:none}
-.purchase-live-indicator[data-state=loading]{background:#283548;border-color:#4b5e75;color:#bed0e4}
-.purchase-live-indicator[data-state=loading] .purchase-pulse{background:#bed0e4;box-shadow:0 0 0 4px #bed0e415}
-.purchase-live-indicator[data-state=error]{background:#382d26;border-color:#78614d;color:#e6c3a1}
-.purchase-live-indicator[data-state=error] .purchase-pulse{background:#e1b886;box-shadow:0 0 0 4px #e1b8861c}
-.purchase-status-caption{font-size:10px;color:#8ba0b6;white-space:nowrap}
-.purchase-board-list{display:grid;gap:9px;min-width:0}
-.purchase-card{display:grid;grid-template-columns:32px minmax(140px,1.3fr) minmax(112px,.65fr) minmax(112px,.58fr) minmax(122px,.62fr);
- align-items:center;gap:clamp(11px,1.5vw,20px);min-width:0;min-height:77px;padding:12px clamp(13px,1.6vw,20px);
- background:linear-gradient(108deg,#273950a6,#1a2838a8 75%,#1e2e41b5);border:1px solid #3a4d63;border-radius:13px;
- box-shadow:inset 0 1px #ffffff10;transition:transform .18s ease,border-color .18s ease}
-.purchase-card:first-child{border-color:#5d7591;background:linear-gradient(110deg,#314961b6,#1f2e40ad 67%,#25394fa8)}
-.purchase-card-rank{font-size:12px;font-weight:850;color:#8ba7c4;letter-spacing:.07em;font-variant-numeric:tabular-nums}
-.purchase-card:first-child .purchase-card-rank{color:#d3e4f7}
-.purchase-card-buyer{display:flex;align-items:center;gap:11px;min-width:0}
-.purchase-card-avatar{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;flex:none;overflow:hidden;
- background:linear-gradient(145deg,#455d79,#283a51);border:1px solid #5a7491;color:#f0f6fd;font-weight:900;letter-spacing:-.1em;font-style:italic;font-size:16px}
-.purchase-card-avatar.has-photo{border-color:#849fbd}
-.purchase-card-avatar img{display:block;width:100%;height:100%;object-fit:cover}
-.purchase-card-buyer-info{display:flex;flex-direction:column;gap:4px;min-width:0}
-.purchase-card-username{color:#f1f5fb;font-size:13px;font-weight:780;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.purchase-card-identity{font-size:10px;color:#92adc8}
-.purchase-card-product{display:flex;flex-direction:column;gap:5px;min-width:0}
-.purchase-card-product-name{color:#e0ebf8;font-size:12px;font-weight:750}
-.purchase-card-product-caption{color:#8da2b7;font-size:10px}
-.purchase-card-price{display:flex;flex-direction:column;gap:5px;min-width:0}
-.purchase-card-price strong{color:#f1f7ff;font-size:15px;font-weight:850;white-space:nowrap;font-variant-numeric:tabular-nums}
-.purchase-card-price small{color:#9db4c9;font-size:10px}
-.purchase-card-date{justify-self:end;text-align:right;color:#bbcadb;font-size:11px;line-height:1.5;font-variant-numeric:tabular-nums}
-.purchase-board-empty{padding:26px 14px;margin:0;text-align:center;border:1px dashed #52647a;border-radius:12px;color:#bfcede;background:#1e2d3e66;font-size:13px}
-.purchase-board-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;padding-top:15px;border-top:1px solid #3a4b60}
-.purchase-board-trust{display:flex;align-items:center;gap:9px;color:#93a6bc;font-size:11px;line-height:1.4}
-.purchase-shield{display:grid;place-items:center;flex:none;width:19px;height:19px;border:1px solid #54756b;border-radius:6px;background:#244439;color:#9ce6c6;font-size:11px}
-.purchase-board-account{display:inline-flex;align-items:center;gap:8px;flex:none;border:0;background:transparent;color:#cfe0f3;
- padding:9px 0 9px 9px;font-size:11px;font-weight:750}
-.purchase-board-account:hover{text-decoration:underline;text-underline-offset:4px}
-.purchase-board-account:focus-visible{outline:2px solid #b8d5f6;outline-offset:3px;border-radius:4px}
-@media(hover:hover) and (pointer:fine){.purchase-card:hover{border-color:#7994af;transform:translateY(-1px)}}
-@media(max-width:970px){
- .purchase-card{grid-template-columns:26px minmax(0,1.2fr) minmax(108px,.75fr) minmax(92px,.65fr);gap:12px}
- .purchase-card-rank,.purchase-card-buyer{grid-row:1 / 3}
- .purchase-card-product{grid-column:3;grid-row:1}
- .purchase-card-price{grid-column:4;grid-row:1;align-items:flex-end}
- .purchase-card-price small{display:none}
- .purchase-card-date{grid-column:3/5;grid-row:2}
-}
-@media(max-width:660px){
- .purchase-board{padding:18px 14px 14px;border-radius:17px;margin-top:23px}
- .purchase-board-heading{align-items:flex-start;margin-bottom:17px;gap:10px}
- .purchase-board-heading h2{font-size:26px;margin:9px 0 6px}
- .purchase-board-heading p{font-size:11px;max-width:250px}
- .purchase-eyebrow{font-size:9px;letter-spacing:.13em}
- .purchase-live-indicator{padding:6px 8px;gap:5px;min-height:27px}
- .purchase-live-text,.purchase-status-caption{display:none}
- .purchase-card{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;gap:5px 8px;min-height:76px;padding:12px 10px}
- .purchase-card-rank{display:none}
- .purchase-card-buyer{grid-column:1;grid-row:1;gap:9px}
- .purchase-card-avatar{width:40px;height:40px;border-radius:11px}
- .purchase-card-username{font-size:12px}
- .purchase-card-product{grid-column:1;grid-row:2;margin-left:49px;display:block}
- .purchase-card-product-name{font-size:11px}
- .purchase-card-product-caption{display:none}
- .purchase-card-price{grid-column:2;grid-row:1;align-items:flex-end}
- .purchase-card-price strong{font-size:14px}
- .purchase-card-date{grid-column:2;grid-row:2;align-self:end;font-size:9px;white-space:nowrap}
- .purchase-board-foot{margin-top:14px;padding-top:13px;gap:10px}
- .purchase-board-trust{font-size:10px}
- .purchase-board-account{font-size:10px;white-space:nowrap}
-}
-@media(max-width:380px){.purchase-board{padding:15px 11px 12px}.purchase-board-heading h2{font-size:23px}
- .purchase-card{padding:11px 9px}.purchase-card-avatar{width:37px;height:37px}.purchase-card-product{margin-left:46px}
- .purchase-board-account span{display:none}}
-@media(prefers-reduced-motion:reduce){.purchase-card{transition:none!important;transform:none!important}}
 
+/* BRO. — smaller metallic activity panel, intentionally understated */
+.purchase-board{
+ position:relative;isolation:isolate;overflow:hidden;
+ width:min(800px,89%);max-width:800px;
+ margin:clamp(20px,3vw,32px) auto clamp(15px,2.5vw,26px);
+ padding:clamp(13px,2vw,20px);
+ border:1px solid #3b4d62;border-radius:17px;
+ background:linear-gradient(122deg,#222f408f,#17212fe8 50%,#182333);
+ box-shadow:inset 0 1px #ffffff10,0 12px 40px #00000022;
+}
+.purchase-board::before{content:"";position:absolute;z-index:-1;inset:0;pointer-events:none;
+ background:repeating-linear-gradient(116deg,transparent 0px,transparent 18px,#ffffff08 19px,transparent 21px),
+ radial-gradient(ellipse 85% 120% at 0% 0%,#7e9bbb12,transparent 80%);
+ opacity:.45}
+.purchase-board::after{content:"";position:absolute;z-index:1;inset:-55% auto -55% -45%;
+ width:20%;transform:translateX(-150%) skewX(-18deg);
+ pointer-events:none;opacity:0;background:linear-gradient(90deg,transparent,#c5dfff12,transparent);
+ animation:purchase-metal-sheen 17s ease-in-out infinite}
+.purchase-board-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;
+ margin:0 0 12px;padding:0;border:0}
+.purchase-board-intro{min-width:0}
+.purchase-eyebrow{display:block;font-size:9px;font-weight:850;letter-spacing:.16em;color:#93aecb}
+.purchase-board-heading h2{font-size:clamp(19px,2vw,23px);line-height:1.16;letter-spacing:-.04em;
+ margin:5px 0 0;font-weight:800}
+.purchase-heading-period{color:#c4ddf7}
+.purchase-live-indicator{display:inline-flex;align-items:center;gap:7px;flex:none;min-height:26px;
+ border:1px solid #395f56;background:#1b3d323f;border-radius:20px;
+ padding:5px 9px;color:#a3d8c0;font-weight:700;font-size:10px;white-space:nowrap}
+.purchase-live-indicator[data-state=error]{border-color:#796047;background:#44342c50;color:#e2c4a1}
+.purchase-live-indicator[data-state=loading]{border-color:#51647c;background:#2c3c5050;color:#b7cde4}
+.purchase-pulse{display:block;flex:none;width:6px;height:6px;border-radius:50%;background:#74d7a8;
+ box-shadow:0 0 0 3px #71d2a71b;animation:purchase-heartbeat 3.8s ease-in-out infinite}
+.purchase-live-indicator[data-state=error] .purchase-pulse{background:#e3b882;animation:none}
+.purchase-live-indicator[data-state=loading] .purchase-pulse{background:#abc5dc;animation:none}
+.purchase-status-caption,.purchase-board-foot,.purchase-eyebrow-line{display:none}
+.purchase-board-list{display:grid;gap:5px;min-width:0}
+.purchase-card{position:relative;display:grid;align-items:center;
+ grid-template-columns:minmax(150px,1fr) minmax(112px,.73fr) minmax(80px,.50fr) minmax(98px,.62fr);
+ gap:10px;min-height:51px;padding:8px 12px;
+ border:1px solid #32465b;border-radius:9px;
+ background:linear-gradient(108deg,#2b3d5080,#202d3d80 54%,#19263488);
+ box-shadow:inset 0 1px #ffffff09;transition:border-color .16s,background .16s;
+}
+.purchase-card:first-child{border-color:#536b85;background:linear-gradient(100deg,#31455b98,#202e4090)}
+.purchase-card-buyer{display:flex;align-items:center;gap:9px;min-width:0}
+.purchase-card-avatar{display:grid;place-items:center;flex:none;width:31px;height:31px;border-radius:9px;
+ background:linear-gradient(130deg,#3c536d,#2a3d55);border:1px solid #526b85;
+ font-size:12px;font-style:italic;font-weight:850;letter-spacing:-.1em;color:#e0efff;overflow:hidden}
+.purchase-card-avatar.has-photo{border-color:#8ba6bf}
+.purchase-card-avatar img{display:block;width:100%;height:100%;object-fit:cover}
+.purchase-card-username{font-size:12px;line-height:1.2;font-weight:700;color:#e8f0f9;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.purchase-card-product{font-size:11px;font-weight:650;color:#b8cbe1;white-space:nowrap}
+.purchase-card-price{font-size:12px;font-weight:800;color:#f0f6ff;white-space:nowrap;font-variant-numeric:tabular-nums}
+.purchase-card-date{font-size:10px;line-height:1.3;color:#9bafc4;white-space:nowrap;justify-self:end;
+ text-align:right;font-variant-numeric:tabular-nums}
+.purchase-board-empty{margin:0;padding:17px 10px;text-align:center;color:#a9bdd1;font-size:12px;
+ border:1px dashed #465b73;border-radius:9px}
+.purchase-card-new{animation:purchase-new-arrival .48s ease-out}
+@media(hover:hover) and (pointer:fine){.purchase-card:hover{border-color:#6a84a0;background:#2d425890}}
+@media(max-width:680px){
+ .purchase-board{width:calc(100% - 30px);margin:17px auto 20px;padding:13px 11px;border-radius:14px}
+ .purchase-board-heading{gap:7px;margin-bottom:10px}
+ .purchase-board-heading h2{font-size:19px;margin-top:5px}
+ .purchase-eyebrow{font-size:8px}
+ .purchase-live-indicator{padding:6px;min-width:25px;justify-content:center;min-height:25px}
+ .purchase-live-text{display:none}
+ .purchase-card{grid-template-columns:minmax(0,1fr) max-content;grid-template-rows:auto auto;
+  column-gap:7px;row-gap:2px;min-height:55px;padding:7px 9px;border-radius:9px}
+ .purchase-card-buyer{grid-column:1;grid-row:1;gap:8px}
+ .purchase-card-avatar{width:30px;height:30px;border-radius:8px}
+ .purchase-card-username{font-size:11px}
+ .purchase-card-product{grid-column:1;grid-row:2;margin-left:38px;font-size:10px}
+ .purchase-card-price{grid-column:2;grid-row:1;font-size:12px;justify-self:end}
+ .purchase-card-date{grid-column:2;grid-row:2;font-size:9px;justify-self:end}
+}
+@media(max-width:360px){.purchase-board{width:calc(100% - 22px);padding:11px 9px}
+ .purchase-card{padding:7px 8px;column-gap:4px}.purchase-card-product{font-size:9px}}
+@keyframes purchase-metal-sheen{
+ 0%,83%{transform:translateX(-160%) skewX(-18deg);opacity:0}
+ 86%{opacity:.5}94%{opacity:.35}
+ 97%,100%{transform:translateX(650%) skewX(-18deg);opacity:0}
+}
+@keyframes purchase-heartbeat{
+ 0%,100%{opacity:.65;box-shadow:0 0 0 3px #71d2a718}
+ 50%{opacity:1;box-shadow:0 0 0 5px #71d2a710}
+}
+@keyframes purchase-new-arrival{from{opacity:.64;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){
+ .purchase-board::after,.purchase-pulse,.purchase-card-new{animation:none!important}
+ .purchase-card{transition:none!important}
+}
 /* Visibility of Discord identity is always an explicit user opt-in. */
 .portal-visibility-setting{display:grid;gap:7px;margin-top:12px;padding:13px 14px;
  border:1px solid #40556a;border-radius:12px;background:linear-gradient(145deg,#202f41,#182535)}
