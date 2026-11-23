@@ -6,6 +6,8 @@ import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconci
 import {communityStats} from '../lib/community.mjs';
 import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
 import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary} from '../lib/activity.mjs';
+import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
+import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
 const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET};
 async function body(req,max) {
   const chunks=[];let size=0;
@@ -83,7 +85,15 @@ export default async function handler(req,res) {
     if(path==='/api/discord/cron'&&req.method==='GET'){
       const secret=process.env.CRON_SECRET;
       if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();
-      return res.json(await reconcileExpiredRoles(bucket));
+      const roles=await reconcileExpiredRoles(bucket);
+      let notifications=null;
+      try{
+        notifications=await reconcilePaymentNotifications(bucket,{
+          apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,
+          date:'today',limit:24
+        });
+      }catch(error){console.error('Discord purchase recovery failed',error?.name);}
+      return res.json({roles,notifications});
     }
     if(path==='/auth/unlink'&&req.method==='POST')return disconnectDiscord(req,res);
     if(path==='/auth/discord'&&req.method==='POST')return startDiscord(res,new URLSearchParams(payload.toString()).get('return_to'));
@@ -94,11 +104,37 @@ export default async function handler(req,res) {
       res.setHeader('Content-Type',img.httpMetadata.contentType);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.end(Buffer.from(await new Response(img.body).arrayBuffer()));
     }
     const user=isWebhook?null:await session(req,res);
+    if(path==='/api/patchnotes' || /^\/api\/patchnotes\/[a-z0-9-]+$/.test(path)){
+      const editor=canEditPatchnotes(user);
+      res.setHeader('Cache-Control','no-store');
+      if(req.method==='GET'){
+        const slug=path==='/api/patchnotes'?null:path.split('/').pop();
+        if(slug){
+          const note=await readPatchnote(bucket,slug,{admin:editor});
+          return note?res.json({note,editor}):res.status(404).json({error:'Mise à jour introuvable.'});
+        }
+        return res.json({notes:await listPatchnotes(bucket,{admin:editor}),editor});
+      }
+      if(req.method!=='POST'||path!=='/api/patchnotes')return res.status(405).end();
+      if(!editor)return res.status(403).json({error:'Publication réservée au compte Discord autorisé.'});
+      const result=await editPatchnote(bucket,JSON.parse(payload.toString()));
+      return res.status(result.status).json(result);
+    }
     if(path==='/api/me'&&req.method==='GET')return res.json({user:user?{
       discordUsername:user.discordUsername,
       discordAvatar:user.discordAvatar,
-      admin:user.admin,discordLinked:!!user.discordId
+      admin:user.admin,patchnotesAdmin:canEditPatchnotes(user),discordLinked:!!user.discordId
     }:null});
+    if(path==='/api/admin/notifications/replay-today'&&req.method==='POST'){
+      if(!canEditPatchnotes(user))return res.status(403).json({error:'Accès réservé au propriétaire Discord.'});
+      if(!billingEnv.WHOP_API_KEY||!billingEnv.WHOP_ACCOUNT_ID)
+        return res.status(503).json({error:'Vérifie les identifiants Whop dans Vercel.'});
+      const result=await reconcilePaymentNotifications(bucket,{
+        apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,
+        date:'today',limit:60
+      });
+      return res.status(result.status==='whop_error'?502:200).json(result);
+    }
     if(path==='/api/account/publicity'){
       if(!user?.discordId)return res.status(401).end();
       if(req.method==='GET')return res.json({showPublic:await getActivityPreference(bucket,user.discordId)});
