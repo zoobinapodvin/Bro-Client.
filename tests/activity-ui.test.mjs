@@ -99,3 +99,50 @@ test('public site contains accessible five-purchase board; account has no e-mail
  assert.match(css,/overflow:hidden!important/);
  assert.match(js,/if\(overview\.keyAvailable\)/);
 });
+
+test('a verified order can upgrade a pre-imported anonymous purchase without changing its payment',async()=>{
+ const b=bucket();
+ const p=payment('pay_LINKED','2026-11-22T13:00:00.000Z');
+ await storeActivity(b,normalizePayment(p,'day'));
+ const linked={...normalizePayment(p,'day'),discordId};
+ const outcome=await storeActivity(b,linked);
+ assert.equal(outcome.updated,true);
+ const record=b.objects['private/activity/receipts/pay_LINKED.json'];
+ assert.equal(record.discordId,discordId);
+ assert.equal(record.name,'Client BRO');
+ assert.equal((await recentPurchases(b))[0].discordId,undefined);
+ // An unrelated account may not overwrite this private verified binding.
+ await storeActivity(b,{...normalizePayment(p,'day',{visible:true,username:'Imposter'}),discordId:'1574096900000000002'});
+ assert.equal(b.objects['private/activity/receipts/pay_LINKED.json'].discordId,discordId);
+});
+test('authenticated opt-in exposes only the verified owner Discord avatar and supports revocation',async()=>{
+ const b=bucket();
+ const p=payment('pay_VISIBLE','2026-11-22T13:00:00.000Z');
+ await storeActivity(b,{...normalizePayment(p,'day'),discordId});
+ const unrelated=payment('pay_PRIVATE','2026-11-22T12:00:00.000Z');
+ await storeActivity(b,normalizePayment(unrelated,'day'));
+ const user={discordId,discordUsername:'BroVerified',discordAvatar:'https://cdn.discordapp.com/avatars/1574096900000000001/hashaabb.png'};
+ await setActivityPreference(b,user,true);
+ let result=await recentPurchases(b);
+ assert.equal(result[0].name,'BroVerified');
+ assert.match(result[0].avatar,/cdn\.discordapp\.com/);
+ assert.equal(result[1].name,'Client BRO');
+ await setActivityPreference(b,user,false);
+ result=await recentPurchases(b);
+ assert.equal(result[0].name,'Client BRO');
+ assert.equal(result[0].avatar,null);
+ assert.equal(b.objects['private/activity/receipts/pay_VISIBLE.json'].discordId,discordId);
+});
+test('new purchase card interface remains accessible and adaptive on mobile',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(html,/class="purchase-board-list"[^>]*aria-live="polite"/);
+ assert.match(html,/data-account>Mon espace/);
+ assert.match(js,/purchase-card-buyer/);
+ assert.match(js,/purchase-card-avatar/);
+ assert.match(js,/profileVisibilitySetting/);
+ assert.match(js,/setInterval\(\(\)=>\{if\(document.visibilityState==='visible'\)refreshRecentBoard\(\);\},15000\)/);
+ assert.match(css,/\.purchase-card\{/);
+ assert.match(css,/@media\(max-width:660px\)/);
+});
