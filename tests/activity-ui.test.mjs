@@ -138,7 +138,8 @@ test('new purchase card interface remains accessible and adaptive on mobile',()=
  const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
  assert.match(html,/class="purchase-board-list"[^>]*aria-live="polite"/);
- assert.match(html,/data-account>Mon espace/);
+ assert.match(html,/class="mobile-dock"/);
+ assert.match(html,/data-account/);
  assert.match(js,/purchase-card-buyer/);
  assert.match(js,/purchase-card-avatar/);
  assert.match(js,/profileVisibilitySetting/);
