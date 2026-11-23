@@ -558,3 +558,20 @@ if(recentBoard){
  setInterval(()=>{if(document.visibilityState==='visible')refreshRecentBoard();},15000);
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshRecentBoard();});
 }
+
+
+/* Offer release badge: updates automatically whenever the owner publishes. */
+if(document.querySelector('[data-patchnote-banner]')){
+ fetch('/api/patchnotes',{cache:'no-store'})
+   .then(res=>{if(!res.ok)throw Error('unavailable');return res.json();})
+   .then(({notes})=>{
+    const latest=Array.isArray(notes)?notes.find(n=>n.status==='published'):null;
+    if(!latest)return;
+    const title=document.querySelector('[data-patchnote-head]');
+    const subtitle=document.querySelector('[data-patchnote-detail]');
+    if(title)title.textContent='Dernière mise à jour · '+latest.version;
+    if(subtitle)subtitle.textContent=latest.title;
+    const banner=document.querySelector('[data-patchnote-banner]');
+    if(banner)banner.href='/patchnotes/'+encodeURIComponent(latest.id);
+   }).catch(()=>{/* The patchnote list remains accessible without an API response. */});
+}
