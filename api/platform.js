@@ -7,6 +7,7 @@ import {communityStats} from '../lib/community.mjs';
 import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
 import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary} from '../lib/activity.mjs';
 import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
+import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
 const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET};
 async function body(req,max) {
   const chunks=[];let size=0;
@@ -84,7 +85,15 @@ export default async function handler(req,res) {
     if(path==='/api/discord/cron'&&req.method==='GET'){
       const secret=process.env.CRON_SECRET;
       if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();
-      return res.json(await reconcileExpiredRoles(bucket));
+      const roles=await reconcileExpiredRoles(bucket);
+      let notifications=null;
+      try{
+        notifications=await reconcilePaymentNotifications(bucket,{
+          apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,
+          date:'recent',limit:24
+        });
+      }catch(error){console.error('Discord purchase recovery failed',error?.name);}
+      return res.json({roles,notifications});
     }
     if(path==='/auth/unlink'&&req.method==='POST')return disconnectDiscord(req,res);
     if(path==='/auth/discord'&&req.method==='POST')return startDiscord(res,new URLSearchParams(payload.toString()).get('return_to'));
@@ -116,6 +125,16 @@ export default async function handler(req,res) {
       discordAvatar:user.discordAvatar,
       admin:user.admin,patchnotesAdmin:canEditPatchnotes(user),discordLinked:!!user.discordId
     }:null});
+    if(path==='/api/admin/notifications/replay-today'&&req.method==='POST'){
+      if(!canEditPatchnotes(user))return res.status(403).json({error:'Accès réservé au propriétaire Discord.'});
+      if(!billingEnv.WHOP_API_KEY||!billingEnv.WHOP_ACCOUNT_ID)
+        return res.status(503).json({error:'Vérifie les identifiants Whop dans Vercel.'});
+      const result=await reconcilePaymentNotifications(bucket,{
+        apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,
+        date:'today',limit:60
+      });
+      return res.status(result.status==='whop_error'?502:200).json(result);
+    }
     if(path==='/api/account/publicity'){
       if(!user?.discordId)return res.status(401).end();
       if(req.method==='GET')return res.json({showPublic:await getActivityPreference(bucket,user.discordId)});
