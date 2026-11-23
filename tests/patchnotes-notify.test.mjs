@@ -72,7 +72,7 @@ test('staff webhooks use each pass category and do not mention an unverified Dis
  globalThis.fetch=async(url,options)=>{
   assert.match(String(url),/^https:\/\/discord\.com\/api\/webhooks\//);
   messages.push({url:String(url),body:JSON.parse(options.body)});
-  return new Response(null,{status:204});
+  return Response.json({id:'1574104664633249843',channel_id:'1574104664633249844',webhook_id:'1574104664633249842'});
  };
  const b=makeBucket();
  const p=payment('pay_ABC123','day');
@@ -87,7 +87,7 @@ test('staff webhooks use each pass category and do not mention an unverified Dis
 test('Discord staff mention is permitted only for a verified linked order',async t=>{
  withFakeWebhooks(t);
  const original=globalThis.fetch;t.after(()=>{globalThis.fetch=original;});
- let body;globalThis.fetch=async(u,opt)=>{body=JSON.parse(opt.body);return new Response(null,{status:204});};
+ let body;globalThis.fetch=async(u,opt)=>{body=JSON.parse(opt.body);return Response.json({id:'1574104664633249843',channel_id:'1574104664633249844',webhook_id:'1574104664633249842'});};
  const b=makeBucket();
  await notifyVerifiedPurchase(b,{planId:'week',discordId:'1027596385123565569'},payment('pay_DEF123','week'));
  assert.deepEqual(body.allowed_mentions.users,['1027596385123565569']);
@@ -104,7 +104,7 @@ test('daily reconciliation routes four confirmed passes and never resends an alr
  const sent=[];
  globalThis.fetch=async(url,options)=>{
   if(String(url).includes('api.whop.com'))return Response.json({data:payments,page_info:{has_next_page:false}});
-  sent.push(String(url));return new Response(null,{status:204});
+  sent.push(String(url));return Response.json({id:'1574104664633249843',channel_id:'1574104664633249844',webhook_id:'1574104664633249842'});
  };
  const b=makeBucket();
  const first=await reconcilePaymentNotifications(b,{apiKey:'test-key',accountId:company,date:'today'});

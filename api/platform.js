@@ -27,6 +27,12 @@ export default async function handler(req,res) {
   const route=parsed.searchParams.get('route')??parsed.pathname.slice(1);
   const path='/'+route;
   try {
+    if(path==='/api/ops/reconcile-sales'&&req.method==='POST'){
+      const token=process.env.BRO_SALES_RECONCILE_TOKEN;
+      if(!token||req.headers.authorization!=='Bearer '+token)return res.status(403).end();
+      const result=await reconcilePaymentNotifications(bucket,{apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,date:'twoDays',limit:60});
+      return res.json(result);
+    }
     const isWebhook=path==='/api/whop/webhook';
     const isInteraction=path==='/api/discord/interactions';
     const isDiscordStart=path==='/auth/discord';
@@ -90,7 +96,7 @@ export default async function handler(req,res) {
       try{
         notifications=await reconcilePaymentNotifications(bucket,{
           apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,
-          date:'today',limit:24
+          date:'twoDays',limit:24
         });
       }catch(error){console.error('Discord purchase recovery failed',error?.name);}
       return res.json({roles,notifications});
