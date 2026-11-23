@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
-import {normalizePayment,backfillWhopHistory,recentPurchases} from '../lib/activity.mjs';
-import {handleBilling} from '../lib/billing.mjs';
+import {normalizePayment,backfillWhopHistory,recentPurchases,setActivityPreference} from '../lib/activity.mjs';
+import {handleBilling,createCheckout} from '../lib/billing.mjs';
 
 const company='biz_emxZArodB6p2Af';
 const payment=(overrides={})=>({
@@ -101,4 +101,97 @@ test('signed direct Whop payment succeeds without a Bro order and never grants D
  assert.equal((await res.json()).received,true);
  assert.ok(b.map.has('private/activity/receipts/pay_TESTabc123.json'));
  assert.equal([...b.map.keys()].filter(v=>v.startsWith('private/discord-entitlements/')).length,0);
+});
+
+test('authenticated Discord checkout creates a Whop order reference without leaking the Discord ID',async t=>{
+ const old=globalThis.fetch;
+ t.after(()=>globalThis.fetch=old);
+ const b=bucket();
+ const u={id:'supabase-tested',discordId:'1574096900000000001',discordUsername:'n7umber#0',
+  discordAvatar:'https://cdn.discordapp.com/avatars/1574096900000000001/testavatar.png'};
+ const plan={id:'day',name:'Pass Jour',price:6,checkoutUrl:'https://whop.com/checkout/plan_MCtWYReKKKb9m/'};
+ let metadata;
+ globalThis.fetch=async(url,options)=>{
+  assert.equal(String(url),'https://api.whop.com/api/v1/checkout_configurations');
+  assert.equal(options.method,'POST');
+  assert.match(options.headers['Idempotency-Key'],/^bro-checkout-/);
+  const request=JSON.parse(options.body);
+  assert.equal(request.variant_id,'plan_MCtWYReKKKb9m');
+  assert.equal(request.account_id,company);
+  assert.equal(Object.keys(request.metadata).length,1);
+  assert.match(request.metadata.bro_order,/^[a-f0-9-]{36}$/);
+  assert.ok(!options.body.includes(u.discordId));
+  metadata=request.metadata;
+  return Response.json({id:'ch_TESTabc123',account_id:company,
+   variant:{id:request.variant_id,currency:'eur',initial_price:6},
+   purchase_url:'https://whop.com/checkout/ch_TESTabc123'});
+ };
+ const dest=await createCheckout({BUCKET:b,WHOP_API_KEY:'test-only',WHOP_ACCOUNT_ID:company,
+   WHOP_WEBHOOK_SECRET:'test-secret'},u,plan,'https://www.broclient.com');
+ assert.equal(dest,'https://whop.com/checkout/ch_TESTabc123');
+ const saved=JSON.parse(b.map.get('private/orders/'+metadata.bro_order));
+ assert.equal(saved.discordId,u.discordId);
+ assert.equal(saved.identity.username,'n7umber#0');
+ assert.equal(saved.checkoutId,'ch_TESTabc123');
+});
+
+test('verified webhook links attributed payment to Discord and publishes only opted-in avatar',async t=>{
+ const original=globalThis.fetch;
+ const oldWebhooks=Object.fromEntries(['BRO_DISCORD_WEBHOOK_DAY','BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY'].map(k=>[k,process.env[k]]));
+ delete process.env.BRO_DISCORD_WEBHOOK_DAY;delete process.env.BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY;
+ t.after(()=>{
+  globalThis.fetch=original;
+  for(const [k,v] of Object.entries(oldWebhooks))if(v===undefined)delete process.env[k];else process.env[k]=v;
+ });
+ const b=bucket(),discordId='1574096900000000001';
+ const user={discordId,discordUsername:'n7umber#0',discordAvatar:'https://cdn.discordapp.com/avatars/1574096900000000001/avatar.png'};
+ await setActivityPreference(b,user,true);
+ const ref='39a1a1ec-f1d2-44a9-90ac-e8ed0f0f1234';
+ b.map.set('private/orders/'+ref,JSON.stringify({
+  owner:'private-owner',discordId,variant:'plan_MCtWYReKKKb9m',planId:'day',
+  checkoutId:'ch_TESTabc123',title:'Pass Jour',identity:{username:user.discordUsername,avatar:user.discordAvatar}
+ }));
+ globalThis.fetch=async(url)=>{
+  assert.match(String(url),/\/payments\/pay_TESTabc123/);
+  return Response.json(payment({metadata:{bro_order:ref},variant_id:'plan_MCtWYReKKKb9m',
+   checkout_configuration_id:'ch_TESTabc123',account_id:company}));
+ };
+ const event=JSON.stringify({type:'payment.succeeded',account_id:company,data:{id:'pay_TESTabc123'}});
+ const secret='test-only-secret';
+ const stamp=String(Math.floor(Date.now()/1000));
+ const id='webhook_test_metadata';
+ const signature=createHmac('sha256',secret).update(id+'.'+stamp+'.'+event).digest('base64');
+ const req=new Request('https://www.broclient.com/api/whop/webhook',{method:'POST',body:event,headers:{
+  'webhook-timestamp':stamp,'webhook-id':id,'webhook-signature':'v1,'+signature,
+  'content-type':'application/json'}});
+ const response=await handleBilling(req,{BUCKET:b,WHOP_API_KEY:'test-key',
+  WHOP_ACCOUNT_ID:company,WHOP_WEBHOOK_SECRET:secret},null);
+ assert.equal(response.status,200);
+ assert.equal((await response.json()).received,true);
+ const records=await recentPurchases(b);
+ assert.equal(records[0].name,'n7umber');
+ assert.equal(records[0].avatar,'https://cdn.discordapp.com/avatars/1574096900000000001/avatar.png');
+ assert.ok(b.map.has('private/discord-entitlements/'+discordId+'/pay_TESTabc123'));
+});
+
+test('invalid payment variant never links a Discord account despite a matching order reference',async t=>{
+ const old=globalThis.fetch;
+ t.after(()=>globalThis.fetch=old);
+ const b=bucket();
+ const ref='a9f6fb67-05ad-4b79-9b80-88abf6041512';
+ b.map.set('private/orders/'+ref,JSON.stringify({
+   discordId:'1574096900000000001',planId:'day',variant:'plan_MCtWYReKKKb9m',checkoutId:'ch_ABC'
+ }));
+ globalThis.fetch=async()=>Response.json(payment({metadata:{bro_order:ref},
+   variant_id:'plan_OTHER',checkout_configuration_id:'ch_ABC'}));
+ const secret='signature-secret',stamp=String(Math.floor(Date.now()/1000)),id='wh_test_mismatch';
+ const raw=JSON.stringify({type:'payment.succeeded',account_id:company,data:{id:'pay_TESTabc123'}});
+ const sig=createHmac('sha256',secret).update(id+'.'+stamp+'.'+raw).digest('base64');
+ const req=new Request('https://www.broclient.com/api/whop/webhook',{method:'POST',body:raw,headers:{
+  'webhook-id':id,'webhook-timestamp':stamp,'webhook-signature':'v1,'+sig
+ }});
+ const r=await handleBilling(req,{BUCKET:b,WHOP_API_KEY:'test',WHOP_ACCOUNT_ID:company,
+ WHOP_WEBHOOK_SECRET:secret},null);
+ assert.equal(r.status,200);
+ assert.equal([...b.map.keys()].filter(k=>k.includes('discord-entitlements/')).length,0);
 });
