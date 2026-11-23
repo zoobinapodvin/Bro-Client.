@@ -519,7 +519,7 @@ function renderRecentFeed(data){
   photo.setAttribute('aria-hidden','true');
   // A Discord profile is public here only after verified association AND opt-in.
   const personal=typeof purchase.name==='string'&&purchase.name.trim()&&purchase.name!=='Client BRO';
-  const pseudo=personal?purchase.name.replace(/#\\d{1,4}$/,'').trim().slice(0,32):'Membre BRO';
+  const pseudo=personal?purchase.name.replace(/#\d{1,4}$/,'').trim().slice(0,32):'Membre BRO';
   if(purchase.avatar&&personal){
    const img=block('img');img.src=purchase.avatar;img.alt='';img.loading='lazy';
    img.decoding='async';img.referrerPolicy='no-referrer';
