@@ -425,7 +425,7 @@ header{box-shadow:0 1px 0 #b4c8e009}
   z-index:0;
   border-radius:inherit;
   pointer-events:none;
-  background:url("/assets/robrun.jpg") center 43% / cover no-repeat;
+  background:url("/assets/robrun-police.webp") center 43% / cover no-repeat;
   opacity:.075;
   filter:grayscale(.25) saturate(.65);
 }
@@ -447,7 +447,7 @@ header{box-shadow:0 1px 0 #b4c8e009}
   pointer-events:none;
   background-image:
     linear-gradient(90deg,rgba(15,28,43,.52),rgba(20,33,49,.44)),
-    url("/assets/robrun.jpg");
+    url("/assets/robrun-police.webp");
   background-size:cover,cover;
   background-position:center,center 48%;
   background-repeat:no-repeat;
