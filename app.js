@@ -465,10 +465,72 @@ if(discordCounter){
 }
 
 
-/* Homepage: latest 5 verified Whop payments only, no invented purchases. */
+/* Homepage: five verified Whop payments, privacy-aware and auto-refreshed. */
 const recentBoard=document.getElementById('purchaseBoard');
 const recentIndicator=document.querySelector('.purchase-live-indicator');
 let lastFeedSignature='';
+function updateRecentStatus(state){
+  if(!recentIndicator)return;
+  const indicatorState=state==='error'||state==='not_configured'?'error':state==='ok'?'ok':'loading';
+  const captions={ok:'Flux actif',error:'Synchronisation différée',loading:'Synchronisation'};
+  const node=recentIndicator.querySelector('.purchase-live-text');
+  recentIndicator.dataset.state=indicatorState;
+  if(node)node.textContent=captions[indicatorState];
+}
+function renderRecentFeed(data){
+  const state=data.sync?.state??'pending';
+  updateRecentStatus(state);
+  const purchases=data.purchases.filter(p=>p&&Number.isFinite(p.amount)&&Number.isFinite(Date.parse(p.date))).slice(0,5);
+  const signature=JSON.stringify([purchases,state]);
+  if(signature===lastFeedSignature)return;
+  lastFeedSignature=signature;
+  if(!purchases.length){
+    const message=state==='ok'
+      ? 'Aucune commande confirmée disponible pour le moment.'
+      : 'Les achats sont momentanément en cours de synchronisation.';
+    recentBoard.replaceChildren(block('p',message,'purchase-board-empty'));
+    return;
+  }
+  const money=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'});
+  const dateFormat=new Intl.DateTimeFormat('fr-FR',{
+    timeZone:'Europe/Paris',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'
+  });
+  const rows=purchases.map((purchase,index)=>{
+    const row=block('article',undefined,'purchase-card');
+    row.setAttribute('role','listitem');
+    const rank=block('span',String(index+1).padStart(2,'0'),'purchase-card-rank');
+    rank.setAttribute('aria-hidden','true');
+    const buyer=block('div',undefined,'purchase-card-buyer');
+    const photo=block('span',undefined,'purchase-card-avatar');
+    photo.setAttribute('aria-hidden','true');
+    const personalized=typeof purchase.name==='string'&&purchase.name!=='Client BRO'&&purchase.name.trim()!=='';
+    if(purchase.avatar&&personalized){
+      const img=block('img');img.src=purchase.avatar;img.alt='';
+      img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';
+      img.onerror=()=>{img.replaceWith(block('span','B.'));};
+      photo.append(img);
+      photo.classList.add('has-photo');
+    }else{
+      photo.append(block('span','B.'));
+    }
+    const buyerInfo=block('div',undefined,'purchase-card-buyer-info');
+    buyerInfo.append(block('strong',personalized?purchase.name:'Membre BRO','purchase-card-username'),
+      block('small',personalized?'Profil Discord':'Profil privé','purchase-card-identity'));
+    buyer.append(photo,buyerInfo);
+    const product=block('div',undefined,'purchase-card-product');
+    product.append(block('span',purchase.plan||'Pass BRO CLIENT','purchase-card-product-name'),
+      block('small','Licence BRO CLIENT','purchase-card-product-caption'));
+    const price=block('div',undefined,'purchase-card-price');
+    price.append(block('strong',money.format(purchase.amount)),
+      block('small','Paiement confirmé'));
+    const when=block('time',dateFormat.format(new Date(purchase.date)),'purchase-card-date');
+    when.dateTime=purchase.date;
+    when.title='Paiement confirmé le '+dateFormat.format(new Date(purchase.date));
+    row.append(rank,buyer,product,price,when);
+    return row;
+  });
+  recentBoard.replaceChildren(...rows);
+}
 async function refreshRecentBoard(){
   if(!recentBoard)return;
   try{
@@ -476,60 +538,17 @@ async function refreshRecentBoard(){
     if(!response.ok)throw Error('feed_unavailable');
     const data=await response.json();
     if(!Array.isArray(data.purchases))throw Error('bad_feed');
-    const state=data.sync?.state??'unknown';
-    if(recentIndicator){
-      const indicatorState=state==='error'||state==='not_configured'?'error':'ok';
-      const caption=indicatorState==='error'?'Synchronisation en attente':'Actualisation automatique';
-      if(recentIndicator.dataset.state!==indicatorState||recentIndicator.textContent.trim()!==caption){
-        recentIndicator.dataset.state=indicatorState;
-        recentIndicator.replaceChildren(block('span',undefined,'purchase-pulse'),document.createTextNode(caption));
-      }
-    }
-    const signature=JSON.stringify([data.purchases,state]);
-    if(signature===lastFeedSignature)return;
-    lastFeedSignature=signature;
-    recentBoard.replaceChildren();
-    if(!data.purchases.length){
-      const message=state==='ok'?'Aucun achat confirmé à afficher pour le moment.':
-        'Synchronisation des paiements en cours. Les achats confirmés seront affichés ici dès leur récupération.';
-      recentBoard.append(block('p',message,'purchase-board-empty'));
-      return;
-    }
-    const money=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'});
-    for(const purchase of data.purchases.slice(0,5)){
-      if(!Number.isFinite(purchase.amount)||!Number.isFinite(Date.parse(purchase.date)))continue;
-      const row=block('div',undefined,'purchase-board-item');
-      const buyer=block('div',undefined,'purchase-board-buyer');
-      const photo=block('span',undefined,'purchase-board-photo');
-      if(purchase.avatar){
-        const img=block('img');img.src=purchase.avatar;img.alt='';
-        img.loading='lazy';img.referrerPolicy='no-referrer';
-        img.onerror=()=>{img.replaceWith(block('span','B'));};
-        photo.append(img);
-      }else photo.append(block('span','B'));
-      const name=block('div',undefined,'purchase-board-name');
-      name.append(block('strong',purchase.name||'Client BRO'),block('small','Achat confirmé'));
-      buyer.append(photo,name);
-      const item=block('span',purchase.plan||'Bro Client','purchase-board-plan');
-      const paid=block('strong',money.format(purchase.amount),'purchase-board-amount');
-      const time=block('time',new Date(purchase.date).toLocaleString('fr-FR',{
-        timeZone:'Europe/Paris',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'
-      }),'purchase-board-date');
-      time.dateTime=purchase.date;
-      row.append(buyer,item,paid,time);
-      recentBoard.append(row);
-    }
+    renderRecentFeed(data);
   }catch{
-    if(recentIndicator){
-      recentIndicator.dataset.state='error';
-      recentIndicator.replaceChildren(block('span',undefined,'purchase-pulse'),document.createTextNode('Synchronisation en attente'));
-    }
-    if(!recentBoard.childElementCount||recentBoard.textContent.includes('Chargement')){
-      recentBoard.replaceChildren(block('p','La récupération des achats est momentanément indisponible.','purchase-board-empty'));
+    updateRecentStatus('error');
+    if(!recentBoard.querySelector('.purchase-card')){
+      recentBoard.replaceChildren(block('p','Impossible de récupérer les achats pour le moment.','purchase-board-empty'));
     }
   }
 }
 if(recentBoard){
+  recentBoard.setAttribute('role','list');
   refreshRecentBoard();
   setInterval(()=>{if(document.visibilityState==='visible')refreshRecentBoard();},15000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshRecentBoard();});
 }
