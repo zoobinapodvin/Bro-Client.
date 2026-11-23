@@ -90,7 +90,7 @@ export default async function handler(req,res) {
       try{
         notifications=await reconcilePaymentNotifications(bucket,{
           apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,
-          date:'recent',limit:24
+          date:'today',limit:24
         });
       }catch(error){console.error('Discord purchase recovery failed',error?.name);}
       return res.json({roles,notifications});
