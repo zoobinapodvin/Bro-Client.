@@ -45,7 +45,7 @@ export default async function handler(req,res) {
       // Receipts only: no anonymous payments are ever bound to Discord accounts.
       // A durable throttle also prevents API errors from triggering repeated
       // expensive upstream requests on every visitor's 15-second poll.
-      const marker='private/activity/whop-feed-refresh.json';
+      const marker='private/activity/whop-feed-refresh-v2.json';
       const previous=await bucket.get(marker);
       let last=previous?await previous.json().catch(()=>null):null;
       const configured=Boolean(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID);
