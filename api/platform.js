@@ -42,22 +42,33 @@ export default async function handler(req,res) {
       return res.json(counts);
     }
     if(path==='/api/activity'&&req.method==='GET'){
-      // Direct Whop checkout links do not carry a Bro order reference. Import
-      // verified company payments for the public feed, without granting roles
-      // or guessing Discord identities. Throttle upstream reads per deployment.
+      // Receipts only: no anonymous payments are ever bound to Discord accounts.
+      // A durable throttle also prevents API errors from triggering repeated
+      // expensive upstream requests on every visitor's 15-second poll.
       const marker='private/activity/whop-feed-refresh.json';
       const previous=await bucket.get(marker);
-      const last=previous?await previous.json().catch(()=>null):null;
-      if(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID&&
-         (!last?.at||Date.now()-Date.parse(last.at)>120000)){
+      let last=previous?await previous.json().catch(()=>null):null;
+      const configured=Boolean(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID);
+      let sync=configured?(last?.status??'pending'):'not_configured';
+      if(configured&&(!last?.at||Date.now()-Date.parse(last.at)>90000)){
+        const at=new Date().toISOString();
         try{
-          await backfillWhopHistory(bucket,{apiKey:billingEnv.WHOP_API_KEY,
-            accountId:billingEnv.WHOP_ACCOUNT_ID,maxPages:2});
-          await bucket.put(marker,JSON.stringify({at:new Date().toISOString()}));
-        }catch(error){console.error('Whop activity refresh failed',error?.message);}
+          const report=await backfillWhopHistory(bucket,{
+            apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,maxPages:2
+          });
+          sync=report.status==='ok'?'ok':'pending';
+          last={at,status:sync,checked:report.reviewed??0,imported:report.imported??0};
+        }catch(error){
+          console.error('Whop activity refresh failed',error?.message);
+          sync='error';last={at,status:sync};
+        }
+        try{await bucket.put(marker,JSON.stringify(last));}catch(error){
+          console.error('Whop activity refresh marker failed',error?.name);
+        }
       }
-      res.setHeader('Cache-Control','public, s-maxage=10, stale-while-revalidate=20');
-      return res.json({purchases:await recentPurchases(bucket)});
+      res.setHeader('Cache-Control','no-store');
+      return res.json({purchases:await recentPurchases(bucket),
+        sync:{state:sync,checkedAt:last?.at??null}});
     }
     if(path==='/api/site'&&req.method==='GET'){
       const {site:config,revision}=await site();return res.json({...config,revision});
