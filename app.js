@@ -29,7 +29,10 @@ function asset(value) {
   catch { return ''; }
 }
 function render(){
-  const c=site.content;
+  const c={...site.content};
+  // Migrate only old marketing copy: preserve newer text customized by admins.
+  if(c.intro==='Choisis ton pass, retrouve tes guides et rejoins la communauté BRO.')
+    c.intro='Aimbot, ESP avancé, outils d’inventaire et profils personnalisés pour ROB RUN. Découvre BRO CLIENT sur PC Windows.';
   document.querySelectorAll('[data-key]').forEach(el=>{if(c[el.dataset.key] !== undefined) el.textContent=c[el.dataset.key];});
   const logo=asset(c.brandLogo);
   document.querySelectorAll('.brand,.small-brand').forEach(el=>{
@@ -462,8 +465,9 @@ if(discordCounter){
 }
 
 
-/* Homepage: last five verified payments, updated every 15 seconds; no fictitious sales. */
+/* Homepage: latest 5 verified Whop payments only, no invented purchases. */
 const recentBoard=document.getElementById('purchaseBoard');
+const recentIndicator=document.querySelector('.purchase-live-indicator');
 let lastFeedSignature='';
 async function refreshRecentBoard(){
   if(!recentBoard)return;
@@ -472,12 +476,23 @@ async function refreshRecentBoard(){
     if(!response.ok)throw Error('feed_unavailable');
     const data=await response.json();
     if(!Array.isArray(data.purchases))throw Error('bad_feed');
-    const signature=JSON.stringify(data.purchases);
+    const state=data.sync?.state??'unknown';
+    if(recentIndicator){
+      const indicatorState=state==='error'||state==='not_configured'?'error':'ok';
+      const caption=indicatorState==='error'?'Synchronisation en attente':'Actualisation automatique';
+      if(recentIndicator.dataset.state!==indicatorState||recentIndicator.textContent.trim()!==caption){
+        recentIndicator.dataset.state=indicatorState;
+        recentIndicator.replaceChildren(block('span',undefined,'purchase-pulse'),document.createTextNode(caption));
+      }
+    }
+    const signature=JSON.stringify([data.purchases,state]);
     if(signature===lastFeedSignature)return;
     lastFeedSignature=signature;
     recentBoard.replaceChildren();
     if(!data.purchases.length){
-      recentBoard.append(block('p','Les prochains achats confirmés apparaîtront ici.','purchase-board-empty'));
+      const message=state==='ok'?'Aucun achat confirmé à afficher pour le moment.':
+        'Synchronisation des paiements en cours. Les achats confirmés seront affichés ici dès leur récupération.';
+      recentBoard.append(block('p',message,'purchase-board-empty'));
       return;
     }
     const money=new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'});
@@ -505,8 +520,13 @@ async function refreshRecentBoard(){
       recentBoard.append(row);
     }
   }catch{
-    if(!recentBoard.childElementCount||recentBoard.textContent.includes('Chargement'))
-      recentBoard.replaceChildren(block('p','Les achats récents sont momentanément indisponibles.','purchase-board-empty'));
+    if(recentIndicator){
+      recentIndicator.dataset.state='error';
+      recentIndicator.replaceChildren(block('span',undefined,'purchase-pulse'),document.createTextNode('Synchronisation en attente'));
+    }
+    if(!recentBoard.childElementCount||recentBoard.textContent.includes('Chargement')){
+      recentBoard.replaceChildren(block('p','La récupération des achats est momentanément indisponible.','purchase-board-empty'));
+    }
   }
 }
 if(recentBoard){
