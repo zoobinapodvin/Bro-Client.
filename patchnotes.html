@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#111b27"><meta name="description" content="Consulte les dernières mises à jour, nouveautés et correctifs de BRO CLIENT pour ROB RUN."><title>Patchnotes · BRO CLIENT</title><link rel="icon" href="/assets/bro-64.png"><link rel="stylesheet" href="/style.css?v=patchnotes-bro-20261123"><script defer src="/patchnotes.js?v=patchnotes-bro-20261123"></script><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/assets/bro-192.png"></head>
+<body class="patchnotes-page">
+<a href="#main" class="skip">Aller au contenu</a>
+<header><div class="shell bar">
+ <a href="/" class="brand" aria-label="BRO CLIENT, accueil"><img src="/assets/bro-192.png" alt="BRO CLIENT" width="100" height="40"></a>
+ <nav aria-label="Navigation principale"><a href="/">Accueil</a><a href="/offres">Offres</a><a href="/#fonctionnalites">Le club</a><a href="/#faq">FAQ</a></nav>
+ <a class="account" href="/auth/discord?return_to=%2Foffres"><span>Discord / Mon compte</span></a>
+</div></header>
+<main id="main" class="shell patchnotes-main">
+ <a href="/offres" class="patchnotes-back">← Retour aux offres</a>
+ <div class="patchnotes-hero">
+   <span class="capability-eyebrow">BRO CLIENT / NOTES DE VERSION</span>
+   <h1 id="patchnotesTitle">Journal des mises à jour<span class="patchnotes-period">.</span></h1>
+   <p id="patchnotesSubtitle">Toutes les évolutions du client Rob Run, correctifs et nouvelles fonctionnalités, au même endroit.</p>
+ </div>
+ <div id="patchnotesAlert" class="patchnotes-alert" role="status" hidden></div>
+ <section id="patchnotesIndex" aria-label="Liste des mises à jour"><div class="patchnotes-list" id="patchnotesList"><p>Chargement des mises à jour…</p></div></section>
+ <article id="patchnotesDetail" class="patchnotes-detail" hidden>
+  <div id="patchnoteContent"></div>
+  <a href="/patchnotes" class="patchnotes-link-bottom">Voir toutes les mises à jour</a>
+ </article>
+ <section id="patchnotesAdmin" class="patchnotes-admin" hidden aria-labelledby="patchnotesAdminTitle">
+  <div class="patchnotes-admin-heading">
+   <div><span class="capability-eyebrow">ESPACE ADMINISTRATEUR</span><h2 id="patchnotesAdminTitle">Publier une mise à jour</h2></div>
+   <button type="button" id="patchnotesNew" class="btn ghost">Nouvelle note</button>
+  </div>
+  <form id="patchnotesForm" class="patchnotes-form">
+   <label>Version <input id="patchnoteVersion" required maxlength="40" placeholder="Ex. 1.2.0"></label>
+   <label>Titre de la mise à jour <input id="patchnoteTitle" required maxlength="90" placeholder="Ex. Améliorations des fonctionnalités"></label>
+   <label class="patchnotes-span">Résumé <textarea id="patchnoteSummary" required maxlength="230" rows="2" placeholder="Une phrase qui résume les changements…"></textarea></label>
+   <label class="patchnotes-span">Notes détaillées <textarea id="patchnoteBody" required minlength="20" maxlength="14000" rows="10" placeholder="Nouveautés, ajustements, corrections…&#10;&#10;Sépare les sections par une ligne vide."></textarea></label>
+   <label class="patchnotes-publish-label"><input type="checkbox" id="patchnotePublish" checked> Publier immédiatement sur le site</label>
+   <div class="patchnotes-editor-actions">
+    <button type="submit" class="btn cyan" id="patchnoteSave">Enregistrer la mise à jour</button>
+    <button type="button" class="btn ghost" id="patchnoteDelete" hidden>Supprimer</button>
+   </div>
+  </form>
+ </section>
+</main>
+<footer><div class="shell foot"><a href="/" class="brand"><span class="mark">BRO<span>.</span></span></a><a href="/offres">Offres</a><a href="https://discord.gg/uRQyKBhhgA" target="_blank" rel="noopener noreferrer">Support Discord</a><p>BRO CLIENT · Mises à jour</p></div></footer>
+<div class="mobile-dock" aria-label="Accès rapides"><a href="/">Accueil</a><a href="/offres">Offres</a><a href="/patchnotes" aria-current="page">Mises à jour</a></div>
+</body></html>
