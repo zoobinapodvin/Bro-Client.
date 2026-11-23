@@ -93,4 +93,19 @@ $('#patchnoteDelete').addEventListener('click',async()=>{
   location.assign('/patchnotes');
  }catch(error){showMessage(error.message,'error');}
 });
+$('#patchnotesReplay').addEventListener('click',async()=>{
+ if(!isEditor)return;
+ const btn=$('#patchnotesReplay'),status=$('#patchnotesReplayStatus');
+ btn.disabled=true;status.textContent='Vérification des transactions confirmées…';
+ try{
+  const result=await api('/api/admin/notifications/replay-today',{
+   method:'POST',headers:{'Content-Type':'application/json'},body:'{}'
+  });
+  status.textContent='Notifications envoyées : '+(result.sent??0)
+   +' · Déjà envoyées : '+(result.alreadySent??0)
+   +' · Paiements sans Discord associé : '+(result.unlinked??0)
+   +' · Échecs : '+(result.errors??0);
+ }catch(error){status.textContent='Impossible de synchroniser : '+error.message;}
+ finally{btn.disabled=false;}
+});
 refresh().catch(e=>{showMessage(e.message,'error');list.replaceChildren(create('p','Impossible de charger les mises à jour.','patchnotes-empty'));});
