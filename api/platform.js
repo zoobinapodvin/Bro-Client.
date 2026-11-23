@@ -6,6 +6,7 @@ import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconci
 import {communityStats} from '../lib/community.mjs';
 import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
 import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary} from '../lib/activity.mjs';
+import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
 const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET};
 async function body(req,max) {
   const chunks=[];let size=0;
@@ -94,10 +95,26 @@ export default async function handler(req,res) {
       res.setHeader('Content-Type',img.httpMetadata.contentType);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.end(Buffer.from(await new Response(img.body).arrayBuffer()));
     }
     const user=isWebhook?null:await session(req,res);
+    if(path==='/api/patchnotes' || /^\/api\/patchnotes\/[a-z0-9-]+$/.test(path)){
+      const editor=canEditPatchnotes(user);
+      res.setHeader('Cache-Control','no-store');
+      if(req.method==='GET'){
+        const slug=path==='/api/patchnotes'?null:path.split('/').pop();
+        if(slug){
+          const note=await readPatchnote(bucket,slug,{admin:editor});
+          return note?res.json({note,editor}):res.status(404).json({error:'Mise à jour introuvable.'});
+        }
+        return res.json({notes:await listPatchnotes(bucket,{admin:editor}),editor});
+      }
+      if(req.method!=='POST'||path!=='/api/patchnotes')return res.status(405).end();
+      if(!editor)return res.status(403).json({error:'Publication réservée au compte Discord autorisé.'});
+      const result=await editPatchnote(bucket,JSON.parse(payload.toString()));
+      return res.status(result.status).json(result);
+    }
     if(path==='/api/me'&&req.method==='GET')return res.json({user:user?{
       discordUsername:user.discordUsername,
       discordAvatar:user.discordAvatar,
-      admin:user.admin,discordLinked:!!user.discordId
+      admin:user.admin,patchnotesAdmin:canEditPatchnotes(user),discordLinked:!!user.discordId
     }:null});
     if(path==='/api/account/publicity'){
       if(!user?.discordId)return res.status(401).end();
