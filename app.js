@@ -173,6 +173,33 @@ async function account(){
   function smallButton(label,callback,cls='btn ghost'){
     return button(label,callback,cls+' portal-action');
   }
+  function profileVisibilitySetting(){
+    const panel=block('div',undefined,'portal-visibility-setting');
+    panel.append(block('strong','Visibilité de mes achats','portal-visibility-title'));
+    panel.append(block('p','Ton pseudo et ton avatar Discord sont affichés uniquement si ton paiement est associé de manière vérifiée à ton compte. Cette option est facultative.','portal-visibility-help'));
+    const choice=block('label',undefined,'portal-consent-label');
+    const checkbox=block('input');checkbox.type='checkbox';
+    choice.append(checkbox,block('span','Afficher mon profil Discord sur les achats associés'));
+    panel.append(choice);
+    fetch('/api/account/publicity',{cache:'no-store'})
+      .then(response=>{if(!response.ok)throw Error();return response.json();})
+      .then(data=>{if(panel.isConnected)checkbox.checked=data.showPublic===true;})
+      .catch(()=>{if(panel.isConnected)checkbox.disabled=true;});
+    checkbox.onchange=async()=>{
+      const checked=checkbox.checked;checkbox.disabled=true;
+      try{
+        const response=await fetch('/api/account/publicity',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({showPublic:checked})
+        });
+        if(!response.ok)throw Error();
+        status(checked?'Profil visible pour tes achats vérifiés et associés.':'Tes achats resteront anonymes sur le site.');
+      }catch{
+        checkbox.checked=!checked;status('Impossible de modifier la visibilité pour le moment.');
+      }finally{checkbox.disabled=false;}
+    };
+    return panel;
+  }
   function show(tab){
     current=tab;viewport.replaceChildren();
     for(const [id,el] of tabButtons){el.classList.toggle('active',id===tab);el.setAttribute('aria-selected',String(id===tab));}
@@ -255,6 +282,7 @@ async function account(){
       }
       const ordersLink=link('Ouvrir mes factures Whop','https://whop.com/@me/settings/orders/','portal-small-link');
       ordersLink.target='_blank';ordersLink.rel='noopener noreferrer';viewport.append(ordersLink);
+      viewport.append(profileVisibilitySetting());
     }else if(tab==='help'){
       viewport.append(block('h3','Besoin d’aide ?'),block('p','Guides, téléchargements et assistance sur le serveur Bro Client.','client-quiet'));
       const links=block('div',undefined,'portal-help-actions');
@@ -262,21 +290,7 @@ async function account(){
       const guild=discordButton('Discord et tickets','https://discord.gg/uRQyKBhhgA','btn client-discord-link portal-action');
       guild.target='_blank';guild.rel='noopener noreferrer';links.append(guild);
       viewport.append(links);
-      const choice=block('label',undefined,'portal-consent-label');
-      const checkbox=block('input');checkbox.type='checkbox';
-      choice.append(checkbox,block('span','Afficher mon pseudo et avatar Discord dans les achats récents (facultatif).'));
-      viewport.append(choice);
-      fetch('/api/account/publicity',{cache:'no-store'}).then(r=>r.json()).then(data=>{if(current==='help')checkbox.checked=!!data.showPublic;}).catch(()=>{});
-      checkbox.onchange=async()=>{
-        const checked=checkbox.checked;checkbox.disabled=true;
-        try{
-          const response=await fetch('/api/account/publicity',{method:'POST',headers:{'Content-Type':'application/json'},
-           body:JSON.stringify({showPublic:checked})});
-          if(!response.ok)throw Error();
-          status(checked?'Pseudo affichable pour les futurs achats confirmés.':'Ton pseudo ne sera plus affiché dans les achats récents.');
-        }catch{checkbox.checked=!checked;status('Préférence indisponible.');}
-        finally{checkbox.disabled=false;}
-      };
+      viewport.append(profileVisibilitySetting());
     }else if(tab==='admin'&&user.admin){
       const area=block('div',undefined,'portal-admin-tools');
       area.append(block('h3','Gestion Bro Client'));
