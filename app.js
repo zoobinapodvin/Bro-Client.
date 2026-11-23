@@ -571,7 +571,8 @@ if(document.querySelector('[data-patchnote-banner]')){
     const subtitle=document.querySelector('[data-patchnote-detail]');
     if(title)title.textContent='Dernière mise à jour · '+latest.version;
     if(subtitle)subtitle.textContent=latest.title;
+    // The badge always opens the complete archive, not a single update.
     const banner=document.querySelector('[data-patchnote-banner]');
-    if(banner)banner.href='/patchnotes/'+encodeURIComponent(latest.id);
+    if(banner)banner.href='/patchnotes';
    }).catch(()=>{/* The patchnote list remains accessible without an API response. */});
 }
