@@ -58,7 +58,17 @@ test('historical Whop import omits forced API version and stores real payments',
 });
 test('signed direct Whop payment succeeds without a Bro order and never grants Discord access',async t=>{
  const original=globalThis.fetch;
- t.after(()=>{globalThis.fetch=original;});
+ const privateNotice=process.env.BRO_DISCORD_WEBHOOK_DAY;
+ const publicNotice=process.env.BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY;
+ delete process.env.BRO_DISCORD_WEBHOOK_DAY;
+ delete process.env.BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY;
+ t.after(()=>{
+  globalThis.fetch=original;
+  if(privateNotice===undefined)delete process.env.BRO_DISCORD_WEBHOOK_DAY;
+  else process.env.BRO_DISCORD_WEBHOOK_DAY=privateNotice;
+  if(publicNotice===undefined)delete process.env.BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY;
+  else process.env.BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY=publicNotice;
+ });
  const b=bucket();
  globalThis.fetch=async (url)=>{
   assert.match(String(url),/api\.whop\.com\/api\/v1\/payments\/pay_TESTabc123/);
