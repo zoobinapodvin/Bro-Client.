@@ -5,24 +5,16 @@
 <section class="shell purchase-board" aria-labelledby="recentSalesTitle">
   <div class="purchase-board-heading">
     <div class="purchase-board-intro">
-      <span class="purchase-eyebrow"><span class="purchase-eyebrow-line" aria-hidden="true"></span> BRO. / COMMUNAUTÉ</span>
+      <span class="purchase-eyebrow">BRO. / ACTIVITÉ</span>
       <h2 id="recentSalesTitle">Derniers achats<span class="purchase-heading-period">.</span></h2>
-      <p>Les 5 dernières commandes BRO CLIENT, vérifiées par Whop.</p>
     </div>
-    <div class="purchase-board-status">
-      <span class="purchase-live-indicator" data-state="loading" aria-live="off">
-        <span class="purchase-pulse" aria-hidden="true"></span><span class="purchase-live-text">Synchronisation en cours</span>
-      </span>
-      <span class="purchase-status-caption">Mise à jour automatique</span>
-    </div>
+    <span class="purchase-live-indicator" data-state="loading" aria-live="off" title="Actualisation automatique">
+      <span class="purchase-pulse" aria-hidden="true"></span>
+      <span class="purchase-live-text">Synchronisation</span>
+    </span>
   </div>
-  <div id="purchaseBoard" class="purchase-board-list" aria-live="polite" aria-relevant="additions text">
-    <p class="purchase-board-empty">Chargement des achats confirmés…</p>
-  </div>
-  <div class="purchase-board-foot">
-    <div class="purchase-board-trust"><span class="purchase-shield" aria-hidden="true">✓</span>
-      <span>Paiements confirmés · Données personnelles protégées</span></div>
-    <button type="button" class="purchase-board-account" data-account>Mon espace <span aria-hidden="true">↗</span></button>
+  <div id="purchaseBoard" class="purchase-board-list" aria-live="off" aria-label="Les cinq derniers achats confirmés">
+    <p class="purchase-board-empty">Chargement des achats…</p>
   </div>
 </section>
 <section class="shell capability-home section" aria-labelledby="broToolsTitle">
