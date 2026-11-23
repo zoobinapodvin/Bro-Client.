@@ -145,7 +145,7 @@ test('new purchase card interface remains accessible and adaptive on mobile',()=
  assert.match(js,/profileVisibilitySetting/);
  assert.match(js,/setInterval\(\(\)=>\{if\(document.visibilityState==='visible'\)refreshRecentBoard\(\);\},15000\)/);
  assert.match(css,/\.purchase-card\{/);
- assert.match(css,/@media\(max-width:660px\)/);
+ assert.match(css,/@media\(max-width:680px\)/);
 });
 
 test('public Discord display strips legacy discriminator without exposing addresses',()=>{
