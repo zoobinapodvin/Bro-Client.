@@ -7,6 +7,14 @@
       "destination": "/offres.html"
     },
     {
+      "source": "/patchnotes",
+      "destination": "/patchnotes.html"
+    },
+    {
+      "source": "/patchnotes/:slug",
+      "destination": "/patchnotes.html"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/platform?route=api/:path*"
     },
