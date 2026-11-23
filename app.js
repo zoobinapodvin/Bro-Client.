@@ -272,7 +272,7 @@ async function account(){
       if(!purchases.length){
         viewport.append(block('p','Ton historique sera affiché après un achat associé à ton compte.','client-quiet'));
       }else{
-        for(const item of purchases.slice(0,3)){
+        for(const item of purchases){
           const row=block('div',undefined,'portal-order-item');
           const names={day:'Jour',week:'Semaine',month:'Mois',life:'Lifetime'};
           row.append(block('strong','Bro Client · '+(names[item.planId]||'Pass')),
@@ -280,6 +280,14 @@ async function account(){
           viewport.append(row);
         }
       }
+      const invoices=block('details');
+      invoices.append(block('summary','Factures et assistance par achat'));
+      invoices.addEventListener('toggle',()=>{
+        if(invoices.open&&!invoices.dataset.loaded){
+          invoices.dataset.loaded='true';loadInvoices(invoices);
+        }
+      });
+      viewport.append(invoices);
       const ordersLink=link('Ouvrir mes factures Whop','https://whop.com/@me/settings/orders/','portal-small-link');
       ordersLink.target='_blank';ordersLink.rel='noopener noreferrer';viewport.append(ordersLink);
       viewport.append(profileVisibilitySetting());
@@ -340,10 +348,20 @@ async function loadInvoices(target,cursor) {
       const date=new Date(invoice.date);
       const amount=new Intl.NumberFormat('fr-FR',{style:'currency',currency:invoice.currency||'EUR'}).format(invoice.amount);
       row.append(block('p',[Number.isNaN(date.valueOf())?'':date.toLocaleDateString('fr-FR'),amount].filter(Boolean).join(' · ')));
-      if(asset(invoice.pdfUrl)){const pdf=link('Voir la facture',asset(invoice.pdfUrl));pdf.target='_blank';pdf.rel='noopener noreferrer';row.append(pdf);}target.append(row);
+      if(/^pay_[A-Za-z0-9]+$/.test(invoice.id)){
+        const ref=block('p','Référence Whop · '+invoice.id);
+        const copy=button('Copier la référence',async()=>{
+          try{await navigator.clipboard.writeText(invoice.id);copy.textContent='Référence copiée';}
+          catch{ref.textContent='Référence à copier : '+invoice.id;}
+        });
+        const support=link('Contacter le support Discord','https://discord.gg/uRQyKBhhgA','portal-small-link');
+        support.target='_blank';support.rel='noopener noreferrer';
+        row.append(ref,copy,support);
+      }
+      if(invoice.pdfUrl==='/api/invoices/'+invoice.id+'/pdf'){const pdf=link('Voir la facture',invoice.pdfUrl);pdf.target='_blank';pdf.rel='noopener noreferrer';row.append(pdf);}target.append(row);
     }
     if(data.nextCursor){const more=button('Voir les paiements précédents',()=>{more.remove();loadInvoices(target,data.nextCursor);});target.append(more);}
-  }catch{note.textContent='Le relevé est temporairement indisponible. Tes achats restent accessibles sur Whop.';}
+  }catch{if(!note.isConnected)target.append(note);note.textContent='Le relevé est temporairement indisponible. Tes achats restent accessibles sur Whop.';}
 }
 const labels={
  legalIdentity:'Identité et statut juridique',legalAddress:'Adresse professionnelle',legalRegistration:'Immatriculation et TVA',legalDirector:'Responsable de publication',legalContact:'E-mail public',legalPhone:'Téléphone professionnel',legalMediator:'Nom, adresse et site du médiateur',brand:'Nom de marque',brandLogo:'Logo',heroImage:'Illustration de l’accueil',navHome:'Lien Accueil',navPlans:'Lien Tarifs',navFeatures:'Lien Fonctionnalités',navFaq:'Lien FAQ',accountLabel:'Espace client',
