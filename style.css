@@ -772,3 +772,13 @@ header{box-shadow:0 1px 0 #b4c8e009}
 #guide-catalogue section{display:grid;gap:12px}.guide-entry{display:block;padding:20px;background:#1b2635;border:1px solid #36495e;border-radius:12px}.guide-entry:hover{border-color:#a4bdd5}
 .guide-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
 @media(max-width:600px){#modal.client-portal-compact{width:100%!important;max-width:100%;margin:auto 0 0;border-radius:18px 18px 0 0;max-height:94dvh!important}#modal.client-portal-compact #modalBody.client-portal-body{padding-bottom:max(20px,env(safe-area-inset-bottom))!important}.portal-orders-heading{flex-wrap:wrap;gap:10px}}
+
+body.guides-page{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.guides-page main{flex:1 0 auto;width:min(100% - 40px,1180px)}
+.guides-page footer{margin-top:auto}
+#guide-catalogue.guide-detail{max-width:1040px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.8fr);column-gap:clamp(28px,6vw,96px);align-content:start;align-items:start}
+.guide-detail>a{grid-column:1/-1;margin-bottom:32px}
+#guide-catalogue.guide-detail h1{font-size:clamp(28px,3vw,44px);margin-top:0}
+.guide-detail progress{width:100%;accent-color:#a4c5df}
+.guide-detail article{border-top:1px solid #374553;padding:20px 0}.guide-detail article label{font-weight:650;cursor:pointer}.guide-detail article p{color:#bdc9d8;line-height:1.65}
+@media(max-width:700px){#guide-catalogue.guide-detail{grid-template-columns:minmax(0,1fr);row-gap:12px}.guide-detail aside{margin-bottom:16px}.guide-detail>a{margin-bottom:12px}}

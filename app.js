@@ -605,12 +605,34 @@ if(location.pathname==='/offres'&&new URLSearchParams(location.search).get('paie
 }
 async function displayGuideCatalogue(root){
  const title=root.querySelector('h1'),list=root.querySelector('section');
+ const selected=new URLSearchParams(location.search).get('guide');
+ if(selected==='assistance'){
+   root.classList.add('guide-detail');
+   root.querySelector('a').href='/guides';root.querySelector('a').textContent='← Tous les guides';
+   title.textContent='Préparer une demande d’assistance';
+   const steps=[
+     ['Identifier le produit','Indique le produit et la durée du pass concernés.'],
+     ['Décrire le problème','Précise ta version de Windows, l’action effectuée et le message d’erreur exact.'],
+     ['Joindre une capture','Masque ta clé et tes identifiants avant de joindre la capture au ticket.'],
+     ['Ouvrir un ticket','Transmets ces éléments au support technique dans un ticket privé.']
+   ];
+   const progress=block('p','0 étape sur 4 terminée');progress.setAttribute('role','status');
+   const meter=document.createElement('progress');meter.max=steps.length;meter.value=0;meter.setAttribute('aria-label','Progression');
+   const aside=block('aside');title.after(aside);aside.append(title,progress,meter);
+   steps.forEach(([heading,description],index)=>{
+     const row=block('article'),label=block('label'),check=document.createElement('input');check.type='checkbox';
+     label.append(check,' '+String(index+1).padStart(2,'0')+' · '+heading);
+     row.append(label,block('p',description));list.append(row);
+     check.onchange=()=>{meter.value=list.querySelectorAll(':checked').length;progress.textContent=meter.value+' / '+steps.length+' étapes terminées';};
+   });
+   list.append(link('Contacter le support Discord','https://discord.gg/uRQyKBhhgA','btn cyan'));return;
+ }
+ if(selected===null)list.append(link('Préparer une demande d’assistance','/guides?guide=assistance','guide-entry'));
  try{
   const response=await fetch('/api/guides',{cache:'no-store'});
   if(response.status===401){list.append(link('Ouvrir mon espace client','/#compte','btn cyan'));return}
   if(!response.ok)throw Error();
   const {guides}=await response.json();
-  const selected=new URLSearchParams(location.search).get('guide');
   if(selected!==null){
    const guide=guides.find((item,index)=>String(index)+'-'+item.title===selected);
    title.textContent=guide?.title||'Guide introuvable';
@@ -618,7 +640,7 @@ async function displayGuideCatalogue(root){
    list.append(link('Tous les guides','/guides'));return;
   }
   for(const [index,guide] of guides.entries())list.append(link(guide.title,'/guides?guide='+encodeURIComponent(index+'-'+guide.title),'guide-entry'));
-  if(!guides.length)list.append(block('p','Aucun guide publié pour le moment.'));
+
  }catch{list.append(block('p','Les guides sont momentanément indisponibles.'))}
 }
 const guideCatalogue=document.querySelector('#guide-catalogue');
