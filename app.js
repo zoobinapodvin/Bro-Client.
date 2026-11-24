@@ -19,7 +19,7 @@ async function requestOverview(){
  const pending=(async()=>{const r=await fetch('/api/account/overview',{cache:'no-store'});if(!r.ok)throw Error('overview');const value=await r.json();if(epoch!==sessionEpoch||!user)throw Error('session_changed');preloadedOverview=value;overviewAt=Date.now();return value;})();
  overviewRequest=pending;try{return await pending;}finally{if(overviewRequest===pending)overviewRequest=null;}
 }
-function syncGuideNavigation(){document.querySelectorAll('[data-paid-guides]').forEach(el=>{el.hidden=user?.guideAccess!==true;});window.dispatchEvent(new Event('bro-session-changed'));}
+function syncGuideNavigation(){document.querySelectorAll('[data-paid-guides]').forEach(el=>{el.hidden=user?.guideAccess!==true;});document.querySelectorAll('[data-guest-checkout-note]').forEach(el=>{el.hidden=!accountReady||user?.discordLinked===true;});window.dispatchEvent(new Event('bro-session-changed'));}
 const block = (tag, text, cls) => {
   const el = document.createElement(tag);
   if(text !== undefined) el.textContent = text;
