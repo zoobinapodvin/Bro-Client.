@@ -85,7 +85,7 @@ async function checkout(plan) {
   const welcome=block('section',undefined,'portal-welcome');
   welcome.append(block('span','BRO CLIENT · CONNEXION SÉCURISÉE','client-kicker'),
     block('h3','Ton pass, lié à ton compte Discord.'),
-    block('p','Connecte-toi avec Discord pour associer ton achat à ton espace client et permettre la synchronisation de ton rôle.'));
+    block('p','Connecte-toi avec Discord avant de payer. Si ton achat n’apparaît pas dans ton espace client, contacte le support avec ton justificatif de paiement.'));
   welcome.append(discordButton('Continuer avec Discord','/auth/discord?return_to='+encodeURIComponent('/offres')));
   body.append(welcome);
 }

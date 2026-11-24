@@ -2,6 +2,7 @@ import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
 import {session,exchange,startDiscord,clear,disconnectDiscord,destination} from '../lib/auth.mjs';
 import {createCheckout,handleBilling,hasConfirmedPurchase} from '../lib/billing.mjs';
+import {authenticatedCheckoutDestination} from '../lib/checkout.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
 import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
@@ -243,8 +244,8 @@ export default async function handler(req,res) {
       
       const {site:config}=await site();const plan=config.plans.find(p=>path==='/checkout/'+p.id);
       if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
-      // A paid checkout must have a verified Discord session. Never fall back
-      // to an anonymous Whop plan: that would silently break account linking.
+      // Require the verified Discord session before any Whop redirect.
+      // A direct fallback cannot automatically grant account entitlements.
       if(!user?.discordId)return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent('/offres'));
       const target=new URL(plan.checkoutUrl);
       if(target.protocol!=='https:'||!['whop.com','www.whop.com'].includes(target.hostname)||
@@ -254,8 +255,8 @@ export default async function handler(req,res) {
       try{
         // Preferred: per-session Whop checkout with a server-stored random
         // order ref in metadata, so the signed webhook can identify Discord.
-        const attributed=await createCheckout(billingEnv,user,plan,'https://www.broclient.com');
-        return res.redirect(302,attributed);
+        const result=await authenticatedCheckoutDestination(billingEnv,user,plan,'https://www.broclient.com',createCheckout);
+        return res.redirect(302,result.url);
       }catch(error){
         console.error('Bro checkout attribution unavailable',{
           plan:plan.id,reason:String(error?.message||'unknown').slice(0,90)

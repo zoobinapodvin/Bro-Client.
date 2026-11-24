@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {checkoutDestination} from '../lib/checkout.mjs';
+import {checkoutDestination,authenticatedCheckoutDestination} from '../lib/checkout.mjs';
 
 const config=JSON.parse(readFileSync(new URL('../defaults.json',import.meta.url),'utf8'));
 test('all four offers let guests buy directly, with no account or Whop API request',async()=>{
@@ -40,4 +40,22 @@ test('checkout UI and explanatory text require Discord',()=>{
  assert.doesNotMatch(src,/return res\.redirect\(302,target\.href\)/);
  assert.match(site,/Connexion Discord requise/);
  assert.match(config.content.a3,/Oui\. Connecte-toi avec Discord/);
+});
+
+test('production authenticated checkout restores all four official links on Whop 403',async()=>{
+ const user={id:'verified-user',discordId:'1574096900000000001'};
+ for(const plan of config.plans){
+   const result=await authenticatedCheckoutDestination({},user,plan,'https://www.broclient.com',async()=>{throw Error('whop_api_403')});
+   assert.deepEqual(result,{url:plan.checkoutUrl,attributed:false});
+ }
+});
+test('production checkout preserves attributed success, rejects guests and fails closed on integrity errors',async()=>{
+ const user={id:'verified-user',discordId:'1574096900000000001'},plan=config.plans[0];
+ assert.deepEqual(await authenticatedCheckoutDestination({},user,plan,'https://www.broclient.com',async()=> 'https://whop.com/checkout/ch_1234'),{url:'https://whop.com/checkout/ch_1234',attributed:true});
+ await assert.rejects(authenticatedCheckoutDestination({},null,plan,'https://www.broclient.com',async()=>{throw Error('must not run')}),/discord_session_required/);
+ await assert.rejects(authenticatedCheckoutDestination({},user,plan,'https://www.broclient.com',async()=>{throw Error('checkout_price_mismatch')}),/checkout_price_mismatch/);
+ await assert.rejects(authenticatedCheckoutDestination({},user,{...plan,checkoutUrl:'https://evil.invalid/checkout/plan_123'},'https://www.broclient.com',async()=>{throw Error('whop_api_403')}),/Invalid official/);
+ const src=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
+ assert.match(src,/await authenticatedCheckoutDestination\(billingEnv,user,plan/);
+ assert.match(src,/return res\.redirect\(302,result\.url\)/);
 });
