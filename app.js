@@ -466,18 +466,6 @@ const sections=Array.from(menu.querySelectorAll('a[href^="#"]')).map(a=>[a,docum
 function updateNav(){if(!sections.length)return;let current=sections[0];for(const pair of sections)if(pair[1].getBoundingClientRect().top<=180)current=pair;for(const [a] of sections)if(a===current[0])a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');}
 window.addEventListener('scroll',updateNav,{passive:true});
 if(location.hash==='#tarifs')location.replace('/offres');
-const gallery=$('.gallery-strip');
-if(gallery){
- const slides=[['launcher','Le launcher'],['visuals','Affichage en jeu'],['settings','Interface de réglages'],['appearance','Options du joueur']];
- for(const [file,label] of slides){
-   const src='/assets/full-'+file+'.webp';
-   const select=button(label,()=>{
-     $('#preview').src=src;$('#preview').alt=label+' — capture de Bro Client';$('#caption').textContent=label;$('#full-preview').href=src;$('#zoom').href=src;
-     for(const item of gallery.children)item.setAttribute('aria-pressed',String(item===select));
-   },'preview-tab');
-   select.setAttribute('aria-pressed',String(file==='launcher'));gallery.append(select);
- }
-}
 (async()=>{
   const session=loadUser();
   try{const res=await fetch('/api/site',{cache:'no-store'});if(!res.ok)throw Error();site=await res.json();if(!site.content||!site.plans)throw Error();}

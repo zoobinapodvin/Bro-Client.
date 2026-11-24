@@ -816,3 +816,6 @@ body.guides-page{min-height:100vh;min-height:100dvh;display:flex;flex-direction:
 
 /* Account registry and staff reconciliation — scoped to the client portal. */
 .bro-account-registry{min-width:0;overflow-wrap:anywhere}.bro-account-registry form{display:grid;gap:9px;margin-top:12px}.bro-account-registry form input:not([type=checkbox]){min-width:0;width:100%;padding:10px 12px;background:#111821;border:1px solid #3b4b60;border-radius:8px;color:#eef2f7}.bro-account-registry form label{display:flex;gap:8px;align-items:flex-start;color:#bdc9d8;font-size:.84rem;line-height:1.5}.bro-account-registry form .btn{min-height:44px;white-space:normal}.portal-identity{min-width:0;overflow-wrap:anywhere}
+
+/* Product transparency remains readable after retiring the old image gallery. */
+.product-transparency{margin-top:20px;padding:16px 18px;border:1px solid #344555;border-radius:12px;background:#151d27;color:#c8d4df;line-height:1.6;font-size:.85rem}.product-transparency h3{font-size:1rem;margin:0 0 6px;color:#eef3f7}.product-transparency p{margin:6px 0}.product-transparency a,.purchase-guide-warning a{color:#b4c8e0;text-decoration:underline;text-underline-offset:3px}.hero-visual{transform:none}.hero-visual:after{animation:none}

@@ -171,3 +171,15 @@ test('homepage has a discreet, compact animated feed without repeated sales copy
  assert.match(js,/purchase-card-new/);
 });
 
+
+
+test('obsolete homepage preview is removed without hiding product and policy disclosures',()=>{
+ const home=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const legal=readFileSync(new URL('../informations.html',import.meta.url),'utf8');
+ assert.doesNotMatch(home,/id="apercus"|Explorer l’interface|full-launcher/);
+ assert.doesNotMatch(js,/const gallery=\$/);
+ assert.match(home,/assistance automatisée à la visée/);
+ assert.match(home,/conformité de la version actuellement distribuée n’a pas été vérifiée/);
+ assert.match(legal,/Discord est obligatoire/);
+});
