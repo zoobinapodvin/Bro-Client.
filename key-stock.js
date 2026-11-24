@@ -41,3 +41,18 @@ $('#import-form').onsubmit=async e=>{
  submitting=true;++revision;busy($('#import-submit'),true,'Import sécurisé…');field.disabled=true;status.textContent='Vérification des doublons et chiffrement…';status.dataset.type='info';
  try{const result=await request(endpoint+'/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({planId:plan,rows})});field.value='';status.textContent=result.added+' ajoutées · '+result.existing+' déjà présentes · '+result.locked+' vendues verrouillées · '+result.quarantined+' à vérifier · '+result.duplicates+' doublons fusionnés · '+result.conflicts+' conflits de catégorie.';status.dataset.type='success';if(result.overview){data=result.overview;selectPlan(plan);}else notice('Import enregistré. Actualise le stock.');}catch(err){status.textContent=err.name==='TimeoutError'?'Réponse trop lente. Actualise le stock avant de réessayer.':err.message;status.dataset.type='error';}finally{submitting=false;field.disabled=false;busy($('#import-submit'),false);if(!data)load();}
 };
+let workbookPreview=null,workbookRequest=0;
+$('#xlsx-file').onchange=async()=>{
+ const rev=++workbookRequest;workbookPreview=null;$('#xlsx-confirm').disabled=true;$('#xlsx-result').textContent='';
+ const file=$('#xlsx-file').files[0],preview=$('#xlsx-preview');preview.textContent=file?'Lecture locale du fichier…':'';preview.dataset.type='info';if(!file)return;
+ try{const result=await window.readStockWorkbook(file);if(rev!==workbookRequest)return;workbookPreview=result;
+  const lines=[];for(const plan of ['day','week','month','life']){const group=result.rows.filter(r=>r.planId===plan);if(group.length)lines.push(labels[plan]+': '+group.filter(r=>r.status==='available').length+' libres · '+group.filter(r=>r.status==='sold').length+' vendues · '+group.filter(r=>r.status==='quarantine').length+' à vérifier');}
+  preview.replaceChildren(...lines.map(s=>el('div',s)),el('div',result.rows.length+' clés uniques · '+result.duplicates+' doublons fusionnés · '+result.ignored+' lignes sans clé ignorées'+(result.unknown.length?' · '+result.unknown.length+' feuilles non reconnues ignorées':'')));preview.dataset.type='success';$('#xlsx-confirm').disabled=false;
+ }catch(err){if(rev===workbookRequest){preview.textContent=err.message||'Impossible de lire ce fichier Excel.';preview.dataset.type='error';}}
+};
+$('#xlsx-confirm').onclick=async()=>{
+ if(submitting||!workbookPreview)return;submitting=true;++revision;const button=$('#xlsx-confirm'),field=$('#xlsx-file'),status=$('#xlsx-result');busy(button,true,'Import sécurisé…');field.disabled=true;status.textContent='Chiffrement et import atomique des feuilles…';status.dataset.type='info';
+ try{const result=await request(endpoint+'/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({planId:null,rows:workbookPreview.rows})});workbookPreview=null;field.value='';$('#xlsx-preview').textContent='';status.textContent=result.added+' ajoutées · '+result.existing+' déjà présentes · '+result.locked+' vendues verrouillées · '+result.quarantined+' à vérifier.';status.dataset.type='success';if(result.overview){data=result.overview;selectPlan('all');}else notice('Import enregistré. Actualise le stock.');}
+ catch(err){status.textContent=err.name==='TimeoutError'?'Réponse trop lente. Actualise le stock puis relance si nécessaire.':err.message;status.dataset.type='error';}
+ finally{submitting=false;field.disabled=false;busy(button,false);button.disabled=!workbookPreview;if(!data)load();}
+};

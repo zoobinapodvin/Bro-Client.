@@ -157,3 +157,12 @@ test('bulk import locks sold duplicates and unknown statuses, preserves category
  const overview=await stockOverview(store);assert.equal(overview.rows.filter(r=>r.status==='sold').length,1);assert.equal(overview.rows.filter(r=>r.status==='quarantine').length,1);assert.equal(overview.counts.day.available,0);
  assert.ok(!JSON.stringify(store.data).includes('TEST-DUPLICATE'));
 });
+test('workbook import validates all categories in one commit and blocks conflicting licences before allocation',async t=>{
+ const old=process.env.BRO_KEY_ENCRYPTION_KEY;process.env.BRO_KEY_ENCRYPTION_KEY='b'.repeat(64);t.after(()=>{if(old===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=old;});
+ const store=bucket(ledger()),admin='1027596385123565569';
+ const rows=[{planId:'day',key:'TEST-CROSS-PLAN',status:'available'},{planId:'week',key:'TEST-CROSS-PLAN',status:'available'},{planId:'day',key:'TEST-DAY-FREE',status:'available'},{planId:'month',key:'TEST-MONTH-SOLD',status:'sold'}];
+ assert.equal((await importStockKeys(store,{planId:null,rows,operatorId:admin})).conflicts,1);
+ assert.equal((await queuePaidKey(store,{discordId:buyer,paymentId:payment,planId:'day',expiresAt:future})).status,'assigned');
+ assert.equal(await readCustomerKey(store,buyer,payment),'TEST-DAY-FREE');
+ const view=await stockOverview(store);assert.equal(view.rows.filter(r=>r.status==='quarantine').length,1);assert.equal(view.rows.filter(r=>r.status==='sold').length,1);
+});
