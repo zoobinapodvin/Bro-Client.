@@ -85,7 +85,7 @@ test('historical import is scoped to paid exact products, does not grant license
  assert.equal(calls,2);
  assert.equal(Object.keys(b.objects).some(key=>key.startsWith('private/discord-entitlements')),false);
 });
-test('public site contains accessible five-purchase board; account has no e-mail field and no empty license tile',()=>{
+test('public site contains accessible five-purchase board; account has no e-mail field and licenses are displayed only per verified purchase',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
@@ -98,7 +98,8 @@ test('public site contains accessible five-purchase board; account has no e-mail
  assert.doesNotMatch(js,/Synchronisation automatique Whop en attente de configuration/);
  assert.match(css,/#modal\.client-portal-compact/);
  assert.match(css,/overflow:hidden!important/);
- assert.match(js,/if\(overview\.keyAvailable\)/);
+ assert.match(js,/if\(purchase\.keyAvailable\)/);
+ assert.match(js,/encodeURIComponent\(purchase\.paymentId\)/);
 });
 
 test('a verified order can upgrade a pre-imported anonymous purchase without changing its payment',async()=>{
