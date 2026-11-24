@@ -7,6 +7,10 @@
       "destination": "/guides.html"
     },
     {
+      "source": "/guides/:slug(avant-de-commencer|installation|assistance)",
+      "destination": "/guides/:slug.html"
+    },
+    {
       "source": "/",
       "has": [
         {

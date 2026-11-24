@@ -11,7 +11,6 @@ for(const path of ['index.html','offres.html','app.js','style.css','assets','def
 
 const {readFile,writeFile}=await import('node:fs/promises');
 const home=await readFile('dist/index.html','utf8');
-const guidePage=home.replace('<body>','<body class="guides-page">').replace(/<main\b[\s\S]*?<\/main>/,'<main id="main" class="shell"><article id="guide-catalogue"><a href="/#compte">← Espace client</a><h1>Guides</h1><section aria-live="polite"></section></article></main>')
- .replace(/<title>[^<]*<\/title>/,'<title>Guides · Bro Client</title>')
- .replaceAll('href="#accueil"','href="/#accueil"').replaceAll('href="#fonctionnalites"','href="/#fonctionnalites"').replaceAll('href="#faq"','href="/#faq"').replace(' aria-current="page"','');
-await writeFile('dist/guides.html',guidePage.replace('<a href="/guides">Guides','<a href="/guides" aria-current="page">Guides'));
+const {buildGuides}=await import('./guides-build.mjs');
+await cp('guides.css','dist/guides.css');
+await buildGuides(home);

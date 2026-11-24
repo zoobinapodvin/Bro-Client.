@@ -1,0 +1,82 @@
+/* Bro Client – static guide pages, scoped to the help centre. */
+.bro-guides-wrap{max-width:1060px;margin-inline:auto;padding:clamp(28px,5vw,72px) 0 68px;color:var(--fg)}
+.bro-guide-back{display:inline-flex;align-items:center;gap:9px;min-height:44px;color:#b8c6d7;font-size:.86rem;font-weight:650}
+.bro-guide-back:hover,.bro-guide-article a:hover{color:#fff}
+.bro-guide-hero{margin:22px 0 38px;max-width:850px}
+.bro-guide-kicker{display:block;font-size:.69rem;letter-spacing:.13em;text-transform:uppercase;color:#a7bfd7;font-weight:720;line-height:1.6}
+.bro-guide-hero h1{font-size:clamp(2rem,4.5vw,3.65rem);line-height:1.08;letter-spacing:-.048em;margin:12px 0 15px;overflow-wrap:anywhere}
+.bro-guide-hero h1>span{color:#a9c7e1}
+.bro-guide-hero p{margin:0;color:#b2c0d0;line-height:1.75;font-size:1rem;max-width:760px}
+.bro-guide-list-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 13px}
+.bro-guide-list-head h2{margin:0;font-size:1.2rem;letter-spacing:-.025em}
+.bro-guide-list-head>span{color:#a6b4c5;font-size:.8rem}
+.bro-guide-list{display:grid;gap:12px}
+.bro-guide-row{display:grid;grid-template-columns:56px minmax(0,1fr) auto;align-items:center;gap:19px;padding:22px 24px;border:1px solid #334254;border-radius:14px;background:#191f28;transition:background .18s,border-color .18s}
+.bro-guide-row:hover{background:#202a37;border-color:#7792af}
+.bro-guide-row-icon{width:52px;height:52px;display:grid;place-items:center;border-radius:12px;background:#263648;border:1px solid #3b5068;color:#bbd2e8}
+.bro-guide-row svg,.bro-guide-next svg{width:24px;height:24px;flex-shrink:0}
+.bro-guide-row-copy h3{font-size:1.15rem;margin:4px 0 6px;line-height:1.3;letter-spacing:-.02em}
+.bro-guide-row-copy p{font-size:.87rem;line-height:1.6;margin:0;color:#afbdce}
+.bro-guide-row-end{display:flex;gap:14px;align-items:center;color:#a8bbcf;font-size:.8rem;white-space:nowrap}
+.bro-guide-help,.bro-guide-support{margin-top:26px;display:flex;gap:24px;align-items:center;justify-content:space-between;border:1px solid #334254;border-radius:14px;background:#161e28;padding:22px}
+.bro-guide-help h2,.bro-guide-support h2{font-size:1.16rem;margin:6px 0 7px}
+.bro-guide-help p,.bro-guide-support p{margin:0;color:#afbdce;font-size:.9rem;line-height:1.65}
+.bro-guide-help .btn,.bro-guide-support .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;min-height:46px;text-align:center}
+.bro-guide-help svg{width:18px;height:18px}
+.bro-guide-layout{display:grid;grid-template-columns:minmax(0,255px) minmax(0,1fr);gap:clamp(24px,4vw,48px);align-items:start}
+.bro-guide-toc{position:sticky;top:24px;min-width:0;padding:16px;border:1px solid #334254;border-radius:14px;background:#191f28}
+.bro-guide-toc h2{font-size:.9rem;margin:0 0 12px}
+.bro-guide-toc [role=navigation]{display:grid;gap:3px}
+.bro-guide-toc a{display:flex;gap:10px;align-items:baseline;font-size:.82rem;line-height:1.5;color:#b9c8d8;padding:10px 8px;border-radius:7px}
+.bro-guide-toc a span{color:#91abc6;font-size:.72rem;font-variant-numeric:tabular-nums}
+.bro-guide-toc a:hover{background:#263648;color:#fff}
+.bro-guide-article{min-width:0;line-height:1.75;overflow-wrap:anywhere}
+.bro-guide-step{padding:0 0 24px;margin:0 0 28px;border-bottom:1px solid #303d4d;scroll-margin-top:24px}
+.bro-guide-step-heading{display:flex;gap:12px;align-items:flex-start;margin-bottom:15px}
+.bro-guide-step-heading>span{display:grid;place-items:center;min-width:34px;height:34px;border:1px solid #405873;border-radius:9px;background:#213044;color:#c2d8ee;font-size:.75rem;font-weight:750}
+.bro-guide-step h2{margin:3px 0 0;font-size:clamp(1.12rem,2.2vw,1.43rem);line-height:1.35;letter-spacing:-.025em}
+.bro-guide-step h3{font-size:1rem;margin:20px 0 8px;color:#e0e8f3}
+.bro-guide-article p,.bro-guide-article li{color:#bec9d8;font-size:.95rem}
+.bro-guide-article p{margin:10px 0}
+.bro-guide-article ul{padding-left:21px;margin:10px 0 15px}
+.bro-guide-article li+li{margin-top:6px}
+.bro-guide-article a:not(.btn):not(.bro-guide-next){color:#c0d7ef;text-decoration:underline;text-underline-offset:3px}
+.bro-guide-article kbd,.bro-guide-article code{border:1px solid #435269;background:#202b39;border-radius:5px;padding:2px 6px;font:inherit;font-size:.85em;color:#e2edf8}
+.bro-guide-downloads{display:grid;gap:10px;margin:16px 0}
+.bro-guide-downloads>div{padding:16px;border:1px solid #34465a;background:#191f28;border-radius:10px}
+.bro-guide-downloads h3{margin:0 0 5px}
+.bro-guide-downloads p{margin:0 0 10px}
+.bro-guide-downloads a{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 12px;border:1px solid #4a617c;border-radius:8px;font-size:.86rem;font-weight:650;text-decoration:none!important}
+.bro-guide-note{margin:18px 0;padding:15px 17px;background:#202b39;border-left:3px solid #9bb8d4;border-radius:7px}
+.bro-guide-note p:last-child{margin-bottom:0}
+.bro-guide-next{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px;border:1px solid #425b75;border-radius:12px;background:#202d3d}
+.bro-guide-next strong{display:block;margin-top:5px;line-height:1.4}
+.bro-guide-next:hover{border-color:#a9c7e1}
+.bro-guide-support{display:block}
+.bro-guide-support .btn{margin-top:14px}
+.bro-guides-page .mobile-dock a[aria-current]{color:#c3ddf5}
+@media(max-width:760px){
+.bro-guides-page main{width:calc(100% - 32px)}
+.bro-guides-wrap{padding:20px 0 38px}
+.bro-guide-hero{margin:14px 0 26px}
+.bro-guide-hero h1{font-size:clamp(1.8rem,7.3vw,2.65rem)}
+.bro-guide-hero p{font-size:.93rem}
+.bro-guide-row{grid-template-columns:42px minmax(0,1fr) 18px;gap:11px;padding:15px 12px;border-radius:12px}
+.bro-guide-row-icon{width:42px;height:42px;border-radius:9px}
+.bro-guide-row-icon svg{width:21px;height:21px}
+.bro-guide-row-copy h3{font-size:1rem;margin-top:3px}
+.bro-guide-row-copy p{font-size:.8rem}
+.bro-guide-row-end>span{display:none}
+.bro-guide-row-end svg{width:18px;height:18px}
+.bro-guide-help{flex-direction:column;align-items:stretch;padding:17px;gap:15px}
+.bro-guide-layout{grid-template-columns:minmax(0,1fr);gap:24px}
+.bro-guide-toc{position:static}
+.bro-guide-toc a{min-height:44px}
+.bro-guide-step{margin-bottom:22px;padding-bottom:20px}
+.bro-guide-step-heading>span{min-width:30px;height:30px}
+.bro-guide-support,.bro-guide-next{padding:16px}
+.bro-guide-support .btn{width:100%}
+.bro-guides-page .mobile-dock{justify-content:space-around;gap:0}
+.bro-guides-page .mobile-dock>*{min-width:0;flex:1;padding:8px 3px;min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){.bro-guide-row{transition:none}}
