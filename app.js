@@ -251,7 +251,7 @@ async function account(){
       viewport.append(block('p','La distribution du launcher a été arrêtée. Pour toute question concernant un achat antérieur, contacte le support.','client-quiet'));
       for(const purchase of active){
         const keyRow=block('div',undefined,'portal-key-row');
-        keyRow.append(block('strong',display[purchase.planId]||'Pass'),block('span',purchase.expiresAt?'Expire le '+new Date(purchase.expiresAt).toLocaleString('fr-FR'):'Accès à vie','client-quiet'));
+        keyRow.append(block('strong',display[purchase.planId]||'Pass'),block('span',purchase.expiresAt?'Accès Discord jusqu’au '+new Date(purchase.expiresAt).toLocaleString('fr-FR'):'Accès Discord à vie','client-quiet'));
         if(purchase.keyAvailable){
           const query='?payment='+encodeURIComponent(purchase.paymentId);
           const input=block('input');input.type='text';input.readOnly=true;input.value='•••• •••• ••••';input.className='portal-key-input';input.setAttribute('aria-label','Clé d’activation');
@@ -259,8 +259,8 @@ async function account(){
           keyRow.append(input);
           const actions=block('div',undefined,'portal-key-actions');
           actions.append(smallButton('Afficher',async()=>{try{input.value=await getKey();}catch{status('Clé indisponible.');}}),smallButton('Copier',async()=>{try{await navigator.clipboard.writeText(await getKey());status('Clé copiée.');}catch{status('Copie indisponible.');}},'btn client-button-primary'),link('.txt','/api/account/key.txt'+query,'btn ghost portal-action'));
-          keyRow.append(actions);
-        }else keyRow.append(block('p',purchase.waitingStock?'Paiement confirmé · Clé en attente de stock.':'Clé en cours de traitement ou achat historique.','client-quiet'));
+          keyRow.append(actions,block('p','Le statut d’activation de ta clé n’est pas transmis au site. La date ci-dessus concerne uniquement l’accès Discord.','client-quiet'));
+        }else keyRow.append(block('p',purchase.waitingStock?'Paiement confirmé · Clé en attente de stock.':'Paiement confirmé · Clé non attribuée. Actualise tes accès ou contacte le support avec ta référence de paiement.','client-quiet'));
         viewport.append(keyRow);
       }
       if(overview.legacyKeyAvailable){
