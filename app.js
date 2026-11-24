@@ -19,7 +19,7 @@ async function requestOverview(){
  const pending=(async()=>{const r=await fetch('/api/account/overview',{cache:'no-store'});if(!r.ok)throw Error('overview');const value=await r.json();if(epoch!==sessionEpoch||!user)throw Error('session_changed');preloadedOverview=value;overviewAt=Date.now();return value;})();
  overviewRequest=pending;try{return await pending;}finally{if(overviewRequest===pending)overviewRequest=null;}
 }
-function syncGuideNavigation(){document.querySelectorAll('[data-paid-guides]').forEach(el=>{el.hidden=user?.guideAccess!==true;});document.querySelectorAll('[data-guest-checkout-note]').forEach(el=>{el.hidden=!accountReady||user?.discordLinked===true;});window.dispatchEvent(new Event('bro-session-changed'));}
+function syncGuideNavigation(){document.querySelectorAll('[data-paid-guides]').forEach(el=>{el.hidden=user?.guideAccess!==true;});document.querySelectorAll('[data-guest-checkout-note]').forEach(el=>{el.hidden=true;});window.dispatchEvent(new Event('bro-session-changed'));}
 const block = (tag, text, cls) => {
   const el = document.createElement(tag);
   if(text !== undefined) el.textContent = text;
@@ -62,7 +62,7 @@ function render(){
     row.append(block('span','BRO.','pass-mark'),block('span',plan.duration,'pass-duration'));
     const price=block('div',undefined,'amount');
     price.append(block('strong',new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(plan.price)+' €'),block('small','paiement unique'));
-    const title=block('h3',plan.name),desc=block('p',plan.description),cta=button(c.planButton,()=>checkout(plan),'btn plan-button');title.dataset.homeField='title';desc.dataset.homeField='text';cta.dataset.homeField='cta';
+    const title=block('h3',plan.name),desc=block('p',plan.description),cta=link(c.planButton,'https://discord.gg/uRQyKBhhgA','btn plan-button');title.dataset.homeField='title';desc.dataset.homeField='text';cta.dataset.homeField='cta';
     card.append(row,title,desc,price,cta); return card;
   }));
   $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');const title=block('summary',c['q'+i]),text=block('p',c['a'+i]);title.dataset.homeField='title';text.dataset.homeField='text';el.append(title,text);if(document.querySelector('[data-home-block="faq-heading"],[data-home-block="offer-faq-heading"]')){const wrap=block('div',undefined,'home-faq-item');wrap.dataset.homeBlock=(document.querySelector('.offers')?'offer-faq-':'faq-')+i;wrap.dataset.homeLabel='Question '+i;wrap.append(el);return wrap;}return el;}));
