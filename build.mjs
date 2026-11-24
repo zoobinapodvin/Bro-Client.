@@ -1,5 +1,5 @@
 import {spawnSync} from 'node:child_process';
-for(const script of ['app.js','api/platform.js','lib/fulfillment.mjs','lib/discord.mjs','lib/purchase-notify.mjs','lib/patchnotes.mjs','patchnotes.js','lib/activity.mjs','lib/checkout.mjs','lib/accounts.mjs','key-stock.js','xlsx-stock.js']){
+for(const script of ['app.js','api/platform.js','lib/fulfillment.mjs','lib/discord.mjs','lib/purchase-notify.mjs','lib/patchnotes.mjs','patchnotes.js','lib/activity.mjs','lib/checkout.mjs','lib/accounts.mjs','key-stock.js','xlsx-stock.js','lib/customer-guides.mjs']){
   const check=spawnSync(process.execPath,['--check',script],{stdio:'inherit'});
   if(check.status!==0)throw Error('JavaScript syntax check failed: '+script);
 }
@@ -9,8 +9,5 @@ import {cp,mkdir} from 'node:fs/promises';
 await mkdir('dist',{recursive:true});
 for(const path of ['index.html','offres.html','app.js','style.css','assets','defaults.json','manifest.webmanifest','informations.html','informations.js','patchnotes.html','patchnotes.js','key-stock.js','key-stock.css','xlsx-stock.js']) await cp(path,'dist/'+path,{recursive:true});
 
-const {readFile,writeFile}=await import('node:fs/promises');
-const home=await readFile('dist/index.html','utf8');
-const {buildGuides}=await import('./guides-build.mjs');
+// The old static installation pages are retired. No guide HTML is shipped in dist.
 await cp('guides.css','dist/guides.css');
-await buildGuides(home);

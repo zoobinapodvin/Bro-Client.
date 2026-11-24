@@ -11,6 +11,7 @@ const paths = {
   menu:'<path d="M3 6h18M3 12h18M3 18h18"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>'
 };
 let site, user = null, accountReady = false;
+function syncGuideNavigation(){document.querySelectorAll('[data-paid-guides]').forEach(el=>{el.hidden=user?.guideAccess!==true;});}
 const block = (tag, text, cls) => {
   const el = document.createElement(tag);
   if(text !== undefined) el.textContent = text;
@@ -156,7 +157,7 @@ async function account(){
     try{
       const res=await fetch('/auth/unlink',{method:'POST'});
       if(!res.ok)throw Error();
-      user=null;account();
+      user=null;syncGuideNavigation();account();
     }catch{notice.textContent='Déconnexion indisponible. Réessaie.';logout.disabled=false;}
   },'portal-logout');
   const discordLogo=block('span',undefined,'discord-brand-icon');discordLogo.innerHTML=discordMark;
@@ -170,6 +171,7 @@ async function account(){
       if(!result.ok)throw Error();
       overview=await result.json();
       purchases=overview.purchases||[];
+      if(user){user.guideAccess=overview.hasPurchase===true;syncGuideNavigation();}
       show(current);
       if(manual)status('Achats actualisés.');
     }catch{
@@ -282,9 +284,9 @@ async function account(){
       ordersLink.target='_blank';ordersLink.rel='noopener noreferrer';viewport.append(ordersLink);
       viewport.append(profileVisibilitySetting());
     }else if(tab==='help'){
-      viewport.append(block('h3','Besoin d’aide ?'),block('p','Guides et assistance sur le serveur Bro Client.','client-quiet'));
+      viewport.append(block('h3','Besoin d’aide ?'),block('p','Assistance pour ton compte et tes achats.','client-quiet'));
       const links=block('div',undefined,'portal-help-actions');
-      links.append(link('Consulter les guides','/guides','btn client-button-primary'));
+      if(user.guideAccess===true)links.append(link('Consulter les guides','/guides','btn client-button-primary'));
       const guild=discordButton('Discord et tickets','https://discord.gg/uRQyKBhhgA','btn client-discord-link portal-action');
       guild.target='_blank';guild.rel='noopener noreferrer';links.append(guild);
       viewport.append(links);
@@ -455,7 +457,7 @@ function editor(){
     }catch{status.textContent='Enregistrement impossible. Vérifie les champs et les liens Whop.';}finally{save.disabled=false;}
   };
 }
-async function loadUser(){try{const response=await fetch('/api/me',{cache:'no-store'});if(!response.ok)throw Error();user=(await response.json()).user;accountReady=true;}catch{accountReady=false;}}
+async function loadUser(){try{const response=await fetch('/api/me',{cache:'no-store'});if(!response.ok)throw Error();user=(await response.json()).user;accountReady=true;}catch{accountReady=false;user=null;}finally{syncGuideNavigation();}}
 document.querySelectorAll('i[data-icon]').forEach(el=>{el.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+paths[el.dataset.icon]+'</svg>';});
 $('.close').onclick=()=>modal.close();modal.addEventListener('click',e=>{if(e.target===modal){const r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)modal.close();}});
 document.querySelectorAll('[data-account]').forEach(el=>el.onclick=account);
@@ -600,9 +602,4 @@ if(document.querySelector('[data-patchnote-banner]')){
 if(location.pathname==='/offres'&&new URLSearchParams(location.search).get('paiement')==='indisponible'){
  const notice=block('p','Le paiement est temporairement indisponible. Ton achat doit être relié à ton compte Discord. Réessaie plus tard.','notice');
  notice.setAttribute('role','alert');document.querySelector('#plans')?.before(notice);
-}
-// Legacy guide URLs remain usable after moving to static detail pages.
-if(location.pathname==='/guides'){
- const slug=new URLSearchParams(location.search).get('guide');
- if(['avant-de-commencer','installation','assistance'].includes(slug))location.replace('/guides/'+slug+location.hash);
 }

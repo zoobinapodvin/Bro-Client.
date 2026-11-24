@@ -3,16 +3,20 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/guides",
+      "destination": "/api/platform?route=guides"
+    },
+    {
+      "source": "/guides.html",
+      "destination": "/api/platform?route=guides.html"
+    },
+    {
+      "source": "/guides/:path*",
+      "destination": "/api/platform?route=guides/:path*"
+    },
+    {
       "source": "/gestion-cles/:path*",
       "destination": "/api/platform?route=gestion-cles/:path*"
-    },
-    {
-      "source": "/guides",
-      "destination": "/guides.html"
-    },
-    {
-      "source": "/guides/:slug(avant-de-commencer|installation|assistance)",
-      "destination": "/guides/:slug.html"
     },
     {
       "source": "/",

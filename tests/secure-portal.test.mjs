@@ -166,3 +166,21 @@ test('workbook import validates all categories in one commit and blocks conflict
  assert.equal(await readCustomerKey(store,buyer,payment),'TEST-DAY-FREE');
  const view=await stockOverview(store);assert.equal(view.rows.filter(r=>r.status==='quarantine').length,1);assert.equal(view.rows.filter(r=>r.status==='sold').length,1);
 });
+
+import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides} from '../lib/customer-guides.mjs';
+test('only verified buyers can read the new customer documentation, including former buyers',async()=>{
+ assert.equal(await canReadCustomerGuides(bucket(ledger()),null),false);
+ assert.equal(await canReadCustomerGuides(bucket(),{discordId:buyer}),false);
+ assert.equal(await canReadCustomerGuides(bucket(ledger()),{discordId:buyer}),true);
+ assert.equal(await canReadCustomerGuides(bucket(ledger()),{discordId:owner}),false);
+ const expired=ledger();expired[prefix+payment].expiresAt='2020-01-01T00:00:00Z';
+ assert.equal(await canReadCustomerGuides(bucket(expired),{discordId:buyer}),true);
+ const catalog=await readCustomerGuideCatalog(bucket({'guides/catalogue.json':[{title:'OLD-ARCHIVE',body:'OLD-ARCHIVE'}]}));
+ assert.equal(catalog.guides.length,3);assert.doesNotMatch(renderCustomerGuides(catalog.guides),/OLD-ARCHIVE|StratX/);
+ assert.doesNotMatch(renderCustomerGuides(),/Préparer une demande d’assistance/);
+ assert.match(renderCustomerGuides([{title:'<script>',body:'test'}]),/&lt;script&gt;/);
+ const build=readFileSync(new URL('../build.mjs',import.meta.url),'utf8');assert.doesNotMatch(build,/await buildGuides/);
+ const config=JSON.parse(readFileSync(new URL('../vercel.json',import.meta.url),'utf8'));
+ assert.ok(config.rewrites.filter(x=>x.source.startsWith('/guides')).every(x=>x.destination.startsWith('/api/platform?route=')));
+ for(const p of ['index.html','offres.html','patchnotes.html'])assert.match(readFileSync(new URL('../'+p,import.meta.url),'utf8'),/data-paid-guides hidden/);
+});

@@ -10,6 +10,7 @@ import {accountOverview,readCustomerKey,ownerStockPath,stockOverview,addStockKey
 import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary} from '../lib/activity.mjs';
 import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
 import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
+import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides,CUSTOMER_GUIDES_KEY} from '../lib/customer-guides.mjs';
 // Profile persistence must never block authentication or the checkout route.
 async function rememberAccount(user){
  try{return await registerAccount(bucket,user);}catch(error){console.error('Bro account registry unavailable',error?.name);return null;}
@@ -126,6 +127,13 @@ export default async function handler(req,res) {
       res.setHeader('Content-Type',img.httpMetadata.contentType);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.end(Buffer.from(await new Response(img.body).arrayBuffer()));
     }
     const user=isWebhook?null:await session(req,res);
+    if(/^\/guides(?:\.html|\/[a-z-]+(?:\.html)?)?$/.test(path)&&req.method==='GET'){
+      res.setHeader('Content-Type','text/html; charset=utf-8');
+      res.setHeader('X-Robots-Tag','noindex, nofollow');
+      if(!await canReadCustomerGuides(bucket,user))return res.status(user?403:401).end(renderCustomerGuides());
+      const catalog=await readCustomerGuideCatalog(bucket);
+      return res.end(renderCustomerGuides(catalog.guides));
+    }
     if(/^\/gestion-cles\/commande\/pay_[A-Za-z0-9]+$/.test(path)&&req.method==='GET'){
       const ownerPath=ownerStockPath(user);
       if(!ownerPath)return res.status(404).end();
@@ -182,11 +190,12 @@ export default async function handler(req,res) {
     }
     if(path==='/api/me'&&req.method==='GET'){
       const account=user?await rememberAccount(user):null;
+      let guideAccess=false;if(user)try{guideAccess=await canReadCustomerGuides(bucket,user);}catch(error){console.error('Guide entitlement unavailable',error?.name);}
       return res.json({user:user?{
       username:account?.username??null,
       discordUsername:user.discordUsername,
       discordAvatar:user.discordAvatar,
-      admin:user.admin,patchnotesAdmin:canEditPatchnotes(user),discordLinked:!!user.discordId,stockPath:ownerStockPath(user)
+      guideAccess,admin:user.admin,patchnotesAdmin:canEditPatchnotes(user),discordLinked:!!user.discordId,stockPath:ownerStockPath(user)
     }:null});
     }
     if(path==='/api/admin/accounts'&&req.method==='GET'){
@@ -270,10 +279,10 @@ export default async function handler(req,res) {
     }
     if(path==='/api/guides'){
       if(!user)return res.status(401).json({error:'Connexion requise.'});
-      const key='guides/catalogue.json';
+      const key=CUSTOMER_GUIDES_KEY;
       if(req.method==='GET'){
-        const saved=await bucket.get(key);
-        return res.json({guides:saved?await saved.json():[],revision:saved?.etag??'initial'});
+        if(!user.admin&&!await canReadCustomerGuides(bucket,user))return res.status(403).json({error:'Achat vérifié requis.'});
+        return res.json(await readCustomerGuideCatalog(bucket));
       }
       if(req.method==='POST'){
         if(!user.admin)return res.status(403).end();

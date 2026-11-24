@@ -819,3 +819,4 @@ body.guides-page{min-height:100vh;min-height:100dvh;display:flex;flex-direction:
 
 /* Product transparency remains readable after retiring the old image gallery. */
 .product-transparency{margin-top:20px;padding:16px 18px;border:1px solid #344555;border-radius:12px;background:#151d27;color:#c8d4df;line-height:1.6;font-size:.85rem}.product-transparency h3{font-size:1rem;margin:0 0 6px;color:#eef3f7}.product-transparency p{margin:6px 0}.product-transparency a,.purchase-guide-warning a{color:#b4c8e0;text-decoration:underline;text-underline-offset:3px}.hero-visual{transform:none}.hero-visual:after{animation:none}
+[data-paid-guides][hidden]{display:none!important}
