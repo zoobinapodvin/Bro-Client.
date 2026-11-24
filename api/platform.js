@@ -1,3 +1,4 @@
+import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
 import {canEditHomepage,readHomepage,saveHomepage} from '../lib/homepage.mjs';
@@ -37,6 +38,28 @@ export default async function handler(req,res) {
   const route=parsed.searchParams.get('route')??parsed.pathname.slice(1);
   const path='/'+route;
   try {
+    // Tebex endpoint: signed validation only. Payments and delivery remain disabled.
+    if(path==='/api/webhooks/tebex'){
+      if(req.method!=='POST'){
+        res.setHeader('Allow','POST');
+        return res.status(405).end();
+      }
+      const secret=process.env.TEBEX_WEBHOOK_SECRET;
+      if(!secret)return res.status(503).json({error:'Webhook not configured'});
+      const raw=await body(req,250000);
+      const signature=req.headers['x-signature'];
+      if(typeof signature!=='string'||!/^[a-f0-9]{64}$/i.test(signature))
+        return res.status(401).end();
+      const expected=createHmac('sha256',secret)
+        .update(createHash('sha256').update(raw).digest('hex')).digest();
+      if(!timingSafeEqual(expected,Buffer.from(signature,'hex')))
+        return res.status(401).end();
+      const event=JSON.parse(raw.toString('utf8'));
+      if(event?.type==='validation.webhook'&&typeof event.id==='string'&&event.id.length>0&&event.id.length<=200)
+        return res.status(200).json({id:event.id});
+      // Do not acknowledge or fulfill real payment events until separately enabled.
+      return res.status(503).json({error:'Payment processing disabled'});
+    }
     if(path==='/api/ops/reconcile-sales'&&req.method==='POST'){
       const token=process.env.BRO_SALES_RECONCILE_TOKEN;
       if(!token||req.headers.authorization!=='Bearer '+token)return res.status(403).end();
