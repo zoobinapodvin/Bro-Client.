@@ -185,7 +185,7 @@ test('obsolete homepage preview is removed and legal navigation remains availabl
 
 
 test('recent feed uses the private index after initial backfill and keeps new receipts current',async()=>{const b=bucket();await storeActivity(b,normalizePayment(payment('pay_INDEX1','2026-11-22T12:00:00Z'),'day'));await recentPurchases(b);const original=b.list;b.list=async()=>{throw Error('full scan should not run');};await storeActivity(b,normalizePayment(payment('pay_INDEX2','2026-11-22T13:00:00Z'),'day'));assert.equal((await recentPurchases(b))[0].date,'2026-11-22T13:00:00.000Z');b.list=original;});
-test('no public invite links and account overview is preloaded without persistent private data',()=>{for(const p of ['index.html','offres.html','patchnotes.html','informations.html','app.js'])assert.doesNotMatch(readFileSync(new URL('../'+p,import.meta.url),'utf8'),/https:\/\/discord\.gg\//);const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');assert.match(js,/preloadedOverview/);assert.doesNotMatch(js,/sessionStorage\.setItem\([^\n]*overview/i);});
+test('pass buttons use only the official community invite and account overview is preloaded without persistent private data',()=>{for(const p of ['index.html','offres.html','patchnotes.html','informations.html'])assert.doesNotMatch(readFileSync(new URL('../'+p,import.meta.url),'utf8'),/https:\/\/discord\.gg\//);const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');const community=readFileSync(new URL('../lib/community.mjs',import.meta.url),'utf8');const invite=community.match(/COMMUNITY_INVITE='([^']+)'/)[1];assert.ok(js.includes("cta=link(c.planButton,'"+invite+"','btn plan-button')"));assert.deepEqual([...js.matchAll(/https:\/\/discord\.gg\/[A-Za-z0-9]+/g)].map(match=>match[0]),[invite]);assert.match(js,/preloadedOverview/);assert.doesNotMatch(js,/sessionStorage\.setItem\([^\n]*overview/i);});
 test('announced product scope and legal navigation remain available',()=>{const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');for(const label of ['Compteur de FPS','Clavier et souris','Widgets de bureau','Personnalisation d’interface','Options cosmétiques autorisées','Profils de configuration'])assert.ok(html.includes(label));assert.match(html,/href="\/informations\.html"/);});
 
 
@@ -244,7 +244,7 @@ test('recent purchase names use customer and lifetime color styles',()=>{
  for(const cls of ['purchase-name-customer','purchase-name-lifetime']){assert.ok(js.includes(cls));assert.ok(css.includes(cls));}
 });
 
-test('checkout assistance is hidden until session verification and visible only to disconnected visitors',async()=>{
+test('checkout assistance remains hidden while pass buttons redirect to Discord',async()=>{
  const html=readFileSync(new URL('../offres.html',import.meta.url),'utf8');
  assert.match(html,/<div class="checkout-note" hidden data-guest-checkout-note/);
  const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
@@ -255,7 +255,7 @@ test('checkout assistance is hidden until session verification and visible only 
  const context={accountReady:false,user:null,document:{querySelectorAll:s=>s==='[data-guest-checkout-note]'?[note]:[]},window:{dispatchEvent(){}},Event:class{}};
  runInNewContext(sync,context);
  context.syncGuideNavigation();assert.equal(note.hidden,true);
- context.accountReady=true;context.syncGuideNavigation();assert.equal(note.hidden,false);
+ context.accountReady=true;context.syncGuideNavigation();assert.equal(note.hidden,true);
  context.user={discordLinked:true};context.syncGuideNavigation();assert.equal(note.hidden,true);
- context.user=null;context.syncGuideNavigation();assert.equal(note.hidden,false);
+ context.user=null;context.syncGuideNavigation();assert.equal(note.hidden,true);
 });
