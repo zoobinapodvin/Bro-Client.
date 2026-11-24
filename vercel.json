@@ -3,6 +3,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/connexion.html",
+      "destination": "/api/platform?route=auth/discord-return"
+    },
+    {
       "source": "/offres",
       "destination": "/offres.html"
     },

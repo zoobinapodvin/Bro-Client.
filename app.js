@@ -112,6 +112,10 @@ async function account(){
     welcome.append(block('span','BRO CLIENT · ESPACE PRIVÉ','client-kicker'),
       block('h3','Retrouve tes accès en un seul endroit.'),
       block('p','Connecte ton compte Discord pour consulter tes achats et tes téléchargements.'));
+    const callbackStatus=new URLSearchParams(location.search).get('connexion');
+    if(callbackStatus==='interrompue'||callbackStatus==='indisponible'){
+      welcome.append(block('p',callbackStatus==='interrompue'?'La connexion Discord a été interrompue. Tu peux réessayer.':'Discord est temporairement indisponible. Réessaie dans un instant.'));
+    }
     welcome.append(discordButton('Continuer avec Discord','/auth/discord'));
     body.append(welcome);
     return;

@@ -51,3 +51,13 @@ test('untrusted form POST is rejected',async()=>{
  const result=await send('POST','/auth/discord','https://attacker.invalid','return_to=%2Fcheckout%2Fmonth');
  assert.equal(result.status,403);
 });
+
+test('legacy callback returns to account without showing a login document',async()=>{
+ const direct=await send('GET','/auth/discord-return');
+ assert.equal(direct.status,303);
+ assert.equal(direct.url,'/#compte');
+ const invalid=await send('GET','/auth/discord-return?code=expired');
+ assert.equal(invalid.url,'/?connexion=interrompue#compte');
+ const login=await send('GET','/auth/login');
+ assert.equal(login.url,'/#compte');
+});

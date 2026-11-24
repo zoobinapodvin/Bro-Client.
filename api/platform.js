@@ -81,7 +81,17 @@ export default async function handler(req,res) {
     if(path==='/api/site'&&req.method==='GET'){
       const {site:config,revision}=await site();return res.json({...config,revision});
     }
-    if(path==='/auth/login'&&req.method==='GET')return res.redirect(302,'/connexion.html?return_to='+encodeURIComponent(destination(parsed.searchParams.get('return_to'))));
+    if(path==='/auth/discord-return'&&req.method==='GET'){
+      res.setHeader('Referrer-Policy','no-referrer');
+      const code=parsed.searchParams.get('code');
+      if(!code)return res.redirect(303,parsed.searchParams.has('error')?'/?connexion=interrompue#compte':'/#compte');
+      try{return await exchange(req,res,{code},true);}
+      catch{return res.redirect(303,'/?connexion=indisponible#compte');}
+    }
+    if(path==='/auth/login'&&req.method==='GET'){
+      const next=destination(parsed.searchParams.get('return_to'));
+      return next==='/#compte'?res.redirect(303,next):res.redirect(303,'/auth/discord?return_to='+encodeURIComponent(next));
+    }
     if(isDiscordStart&&req.method==='GET')
       return startDiscord(res,parsed.searchParams.get('return_to'));
     if(path==='/auth/logout'&&req.method==='GET'){clear(res);return res.redirect(303,'/');}
