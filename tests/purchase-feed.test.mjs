@@ -115,6 +115,7 @@ test('authenticated Discord checkout creates a Whop order reference without leak
   assert.equal(String(url),'https://api.whop.com/api/v1/checkout_configurations');
   assert.equal(options.method,'POST');
   assert.match(options.headers['Idempotency-Key'],/^bro-checkout-/);
+  assert.equal(options.headers['Api-Version-Date'],'2026-11-20');
   const request=JSON.parse(options.body);
   assert.equal(request.variant_id,'plan_MCtWYReKKKb9m');
   assert.equal(request.account_id,company);
@@ -194,4 +195,14 @@ test('invalid payment variant never links a Discord account despite a matching o
  WHOP_WEBHOOK_SECRET:secret},null);
  assert.equal(r.status,200);
  assert.equal([...b.map.keys()].filter(k=>k.includes('discord-entitlements/')).length,0);
+});
+
+
+test('checkout rejects Whop permission errors without returning an unlinked payment URL',async t=>{
+ const old=globalThis.fetch;t.after(()=>globalThis.fetch=old);
+ const b=bucket(),u={id:'verified-user',discordId:'1574096900000000001'};
+ const plan={id:'day',name:'Pass Jour',price:6,checkoutUrl:'https://whop.com/checkout/plan_MCtWYReKKKb9m/'};
+ globalThis.fetch=async()=>new Response(null,{status:403});
+ await assert.rejects(createCheckout({BUCKET:b,WHOP_API_KEY:'test-only',WHOP_ACCOUNT_ID:company,WHOP_WEBHOOK_SECRET:'test-secret'},u,plan,'https://www.broclient.com'),/whop_api_403/);
+ assert.equal([...b.map.keys()].filter(k=>k.startsWith('private/invoices/')).length,0);
 });
