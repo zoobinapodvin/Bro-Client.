@@ -257,12 +257,10 @@ export default async function handler(req,res) {
         const attributed=await createCheckout(billingEnv,user,plan,'https://www.broclient.com');
         return res.redirect(302,attributed);
       }catch(error){
-        // Keep sales functional if Whop lacks the checkout:create permission.
-        // This fallback is NOT linked to Discord and grants no automatic role.
         console.error('Bro checkout attribution unavailable',{
           plan:plan.id,reason:String(error?.message||'unknown').slice(0,90)
         });
-        return res.redirect(302,target.href);
+        return res.redirect(303,'/offres?paiement=indisponible');
       }
     }
     return res.status(404).end();

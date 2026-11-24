@@ -298,7 +298,7 @@ async function account(){
     }else if(tab==='help'){
       viewport.append(block('h3','Besoin d’aide ?'),block('p','Guides, téléchargements et assistance sur le serveur Bro Client.','client-quiet'));
       const links=block('div',undefined,'portal-help-actions');
-      links.append(smallButton('Consulter les guides',()=>guides(false)));
+      links.append(link('Consulter les guides','/guides','btn client-button-primary'));
       const guild=discordButton('Discord et tickets','https://discord.gg/uRQyKBhhgA','btn client-discord-link portal-action');
       guild.target='_blank';guild.rel='noopener noreferrer';links.append(guild);
       viewport.append(links);
@@ -598,3 +598,28 @@ if(document.querySelector('[data-patchnote-banner]')){
     if(banner)banner.href='/patchnotes';
    }).catch(()=>{/* The patchnote list remains accessible without an API response. */});
 }
+
+if(location.pathname==='/offres'&&new URLSearchParams(location.search).get('paiement')==='indisponible'){
+ const notice=block('p','Le paiement est temporairement indisponible. Ton achat doit être relié à ton compte Discord. Réessaie plus tard.','notice');
+ notice.setAttribute('role','alert');document.querySelector('#plans')?.before(notice);
+}
+async function displayGuideCatalogue(root){
+ const title=root.querySelector('h1'),list=root.querySelector('section');
+ try{
+  const response=await fetch('/api/guides',{cache:'no-store'});
+  if(response.status===401){list.append(link('Ouvrir mon espace client','/#compte','btn cyan'));return}
+  if(!response.ok)throw Error();
+  const {guides}=await response.json();
+  const selected=new URLSearchParams(location.search).get('guide');
+  if(selected!==null){
+   const guide=guides.find((item,index)=>String(index)+'-'+item.title===selected);
+   title.textContent=guide?.title||'Guide introuvable';
+   if(guide)list.append(block('p',guide.body,'guide-body'));
+   list.append(link('Tous les guides','/guides'));return;
+  }
+  for(const [index,guide] of guides.entries())list.append(link(guide.title,'/guides?guide='+encodeURIComponent(index+'-'+guide.title),'guide-entry'));
+  if(!guides.length)list.append(block('p','Aucun guide publié pour le moment.'));
+ }catch{list.append(block('p','Les guides sont momentanément indisponibles.'))}
+}
+const guideCatalogue=document.querySelector('#guide-catalogue');
+if(guideCatalogue)displayGuideCatalogue(guideCatalogue);

@@ -3,6 +3,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/guides",
+      "destination": "/guides.html"
+    },
+    {
       "source": "/",
       "has": [
         {
