@@ -220,7 +220,7 @@ export default async function handler(req,res) {
         const choice=JSON.parse(payload.toString());
         if(typeof choice?.showPublic!=='boolean')return res.status(422).end();
         let profile=null;try{profile=await readAccount(bucket,user.discordId);}catch{}
-        return res.json(await setActivityPreference(bucket,{...user,username:profile?.username},choice.showPublic));
+        return res.json(await setActivityPreference(bucket,{...user,username:profile?.displayName??user.discordUsername,discordAvatar:profile?.avatar??user.discordAvatar},choice.showPublic));
       }
       return res.status(405).end();
     }
