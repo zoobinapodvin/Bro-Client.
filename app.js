@@ -31,8 +31,8 @@ function asset(value) {
 function render(){
   const c={...site.content};
   // Migrate only old marketing copy: preserve newer text customized by admins.
-  if(c.intro==='Choisis ton pass, retrouve tes guides et rejoins la communauté BRO.')
-    c.intro='Aimbot, ESP avancé, outils d’inventaire et profils personnalisés pour ROB RUN. Découvre BRO CLIENT sur PC Windows.';
+  if(['Choisis ton pass, retrouve tes guides et rejoins la communauté BRO.','Aimbot, ESP avancé, outils d’inventaire et profils personnalisés pour ROB RUN. Découvre BRO CLIENT sur PC Windows.'].includes(c.intro))
+    c.intro="Découvre BRO CLIENT, ses accès, ses réglages et sa communauté. Retrouve tes guides et ton espace client au même endroit.";
   document.querySelectorAll('[data-key]').forEach(el=>{if(c[el.dataset.key] !== undefined) el.textContent=c[el.dataset.key];});
   const logo=asset(c.brandLogo);
   document.querySelectorAll('.brand,.small-brand').forEach(el=>{
