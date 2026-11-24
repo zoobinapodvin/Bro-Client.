@@ -580,7 +580,9 @@ function renderRecentFeed(data){
    img.onerror=()=>{img.replaceWith(block('span','B.'));};
    photo.append(img);photo.classList.add('has-photo');
   }else photo.append(block('span','B.'));
-  buyer.append(photo,block('strong',pseudo||'Membre BRO','purchase-card-username'));
+  const username=block('strong',pseudo||'Membre BRO','purchase-card-username');
+  if(personal){username.classList.add(purchase.planId==='life'||purchase.plan==='Pass Lifetime'?'purchase-name-lifetime':'purchase-name-customer');username.title=pseudo;}
+  buyer.append(photo,username);
   const name=block('span',purchase.plan||'Pass Bro Client','purchase-card-product');
   const amount=block('strong',currency.format(purchase.amount),'purchase-card-price');
   const when=block('time',datetime.format(new Date(purchase.date)).replace(',',' ·'),'purchase-card-date');
