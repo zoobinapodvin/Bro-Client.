@@ -57,7 +57,7 @@ test('production checkout preserves attributed success, rejects guests and fails
  await assert.rejects(authenticatedCheckoutDestination({},user,{...plan,checkoutUrl:'https://evil.invalid/checkout/plan_123'},'https://www.broclient.com',async()=>{throw Error('whop_api_403')}),/Invalid official/);
  const src=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
  assert.match(src,/https:\/\/headless\.tebex\.io\/api/);
- assert.match(src,/return res\.redirect\(303,target\.href\)/);
+ assert.match(src,/return res\.redirect\(303,target\)/);
 });
 
 test('all new plans use authenticated dynamic checkouts and no fallback',async()=>{
