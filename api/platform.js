@@ -126,6 +126,12 @@ export default async function handler(req,res) {
       res.setHeader('Content-Type',img.httpMetadata.contentType);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.end(Buffer.from(await new Response(img.body).arrayBuffer()));
     }
     const user=isWebhook?null:await session(req,res);
+    if(/^\/gestion-cles\/commande\/pay_[A-Za-z0-9]+$/.test(path)&&req.method==='GET'){
+      const ownerPath=ownerStockPath(user);
+      if(!ownerPath)return res.status(404).end();
+      res.setHeader('Referrer-Policy','no-referrer');
+      return res.redirect(303,ownerPath+'?payment='+encodeURIComponent(path.split('/').pop()));
+    }
     if(path.startsWith('/gestion-cles/')){
       const privatePath=ownerStockPath(user);
       if(!privatePath||!(path===privatePath||path===privatePath+'/stock'))return res.status(404).end();

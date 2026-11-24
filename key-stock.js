@@ -32,7 +32,8 @@ $('#close-dialog').onclick=()=>$('#key-dialog').close();$('#key-dialog').addEven
 $('#copy-key').onclick=async()=>{try{await navigator.clipboard.writeText($('#revealed').value);$('#copy-status').textContent='Clé copiée.';}catch{$('#revealed').select();$('#copy-status').textContent='Copie manuelle disponible.';}};
 $('#toggle-key').onclick=()=>{const input=$('#key');input.type=input.type==='password'?'text':'password';$('#toggle-key').textContent=input.type==='password'?'Afficher':'Masquer';};
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>selectPlan(b.dataset.plan));
-$('#search').oninput=()=>{page=1;render();};$('#state').onchange=()=>{page=1;render();};$('#refresh').onclick=()=>load({manual:true});load();
+$('#search').oninput=()=>{page=1;render();};$('#state').onchange=()=>{page=1;render();};$('#refresh').onclick=()=>load({manual:true});
+const linkedPayment=new URLSearchParams(location.search).get('payment');if(/^pay_[A-Za-z0-9]+$/.test(linkedPayment||''))$('#search').value=linkedPayment;load();
 $('#import-form').onsubmit=async e=>{
  e.preventDefault();if(submitting)return;
  const field=$('#import-rows'),plan=$('#import-plan').value,status=$('#import-status');

@@ -124,3 +124,25 @@ test('patchnotes routes and mobile design are included in the production build',
  assert.match(offers,/data-patchnote-banner/);
 });
 
+
+test('purchase notification includes a protected license reference and verified Discord identity without plaintext',async t=>{
+ withFakeWebhooks(t);
+ const b=makeBucket(),original=globalThis.fetch; t.after(()=>globalThis.fetch=original);
+ const discordId='1574096900000000001',p=payment('pay_KEY123','day'),order={planId:'day',discordId};
+ const messages=[];
+ globalThis.fetch=async(url,options)=>{messages.push({url:String(url),method:options.method,body:JSON.parse(options.body)});return Response.json({id:'1574104664633249843',channel_id:'1574104664633249844',webhook_id:'1574104664633249842'});};
+ await b.put('private/licenses/inventory-v1.json',JSON.stringify({v:1,keys:[],pending:[{paymentId:p.id,discordId,planId:'day',expiresAt:null}]}));
+ assert.equal((await notifyVerifiedPurchase(b,order,p)).ok,true);
+ assert.match(messages[0].body.embeds[0].fields.find(x=>x.name==='Clé attribuée').value,/En attente de stock/);
+ await b.put('private/licenses/inventory-v1.json',JSON.stringify({v:1,keys:[{id:'a'.repeat(64),paymentId:p.id,discordId,planId:'day',encrypted:{data:'TEST-NEVER-SEND'}}],pending:[]}));
+ // Expire the existing send lease before editing the original notification.
+ const lease=[...b.data.keys()].find(k=>k.endsWith('.lease'));await b.put(lease,JSON.stringify({until:0}));
+ assert.equal((await notifyVerifiedPurchase(b,order,p)).ok,true);
+ assert.equal(messages[1].method,'PATCH');
+ assert.match(messages[1].url,/\/messages\/1574104664633249843$/);
+ assert.match(messages[1].body.embeds[0].fields.find(x=>x.name==='Clé attribuée').value,/Attribuée · Réf. aaaaaaaaaaaaaaaa/);
+ assert.match(messages[1].body.embeds[0].fields.find(x=>x.name==='Compte Discord').value,new RegExp(discordId));
+ assert.match(messages[1].body.embeds[0].fields.find(x=>x.name==='Gestion sécurisée').value,/gestion-cles\/commande\/pay_KEY123/);
+ assert.ok(!JSON.stringify(messages).includes('TEST-NEVER-SEND'));
+ assert.equal((await notifyVerifiedPurchase(b,order,p)).alreadySent,true);assert.equal(messages.length,2);
+});
