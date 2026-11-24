@@ -1,5 +1,6 @@
 import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
+import {canEditHomepage,readHomepage,saveHomepage} from '../lib/homepage.mjs';
 import {session,exchange,startDiscord,clear,disconnectDiscord,destination} from '../lib/auth.mjs';
 import {createCheckout,handleBilling,hasConfirmedPurchase,attachVerifiedPayment,recoverAttributedPayment} from '../lib/billing.mjs';
 import {authenticatedCheckoutDestination,validWhopPlan} from '../lib/checkout.mjs';
@@ -61,6 +62,10 @@ export default async function handler(req,res) {
       res.setHeader('Cache-Control','private, no-store');
       return res.json({purchases:await recentPurchases(bucket),sync:{state:'ok'}});
     }
+    if(path==='/api/homepage'&&req.method==='GET'){
+      res.setHeader('Cache-Control','public, s-maxage=3, max-age=0, must-revalidate');
+      return res.json(await readHomepage(bucket));
+    }
     if(path==='/api/site'&&req.method==='GET'){
       const {site:config,revision}=await site();return res.json({...config,revision});
     }
@@ -79,7 +84,7 @@ export default async function handler(req,res) {
       return startDiscord(res,parsed.searchParams.get('return_to'));
     if(path==='/auth/logout'&&req.method==='GET'){clear(res);return res.redirect(303,'/');}
     const payload=req.method==='POST'?await body(req,
-      path==='/api/admin/release'?4*1024*1024:path==='/api/media'?4*1024*1024:isWebhook?250000:100000):undefined;
+      path==='/api/admin/release'?4*1024*1024:(path==='/api/media'||path==='/api/homepage/media')?4*1024*1024:isWebhook?250000:100000):undefined;
     if(isInteraction&&req.method==='POST')return handleInteraction(req,res,payload,bucket);
     if(path==='/api/discord/cron'&&req.method==='GET'){
       const secret=process.env.CRON_SECRET;
@@ -104,6 +109,11 @@ export default async function handler(req,res) {
       res.setHeader('Content-Type',img.httpMetadata.contentType);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.end(Buffer.from(await new Response(img.body).arrayBuffer()));
     }
     const user=isWebhook?null:await session(req,res);
+    if((path==='/api/homepage'||path==='/api/homepage/media')&&req.method==='POST'){
+      if(!canEditHomepage(user))return res.status(403).json({error:'Accès propriétaire requis.'});
+      if(path.endsWith('/media'))return await respond(res,await upload(new Request(new URL(path,origin),{method:'POST',headers:req.headers,body:payload}),bucket));
+      return await respond(res,await saveHomepage(bucket,user,req.headers['if-match'],JSON.parse(payload.toString())));
+    }
     if(/^\/guides(?:\.html|\/[a-z-]+(?:\.html)?)?$/.test(path)&&req.method==='GET'){
       res.setHeader('Content-Type','text/html; charset=utf-8');
       res.setHeader('X-Robots-Tag','noindex, nofollow');
@@ -172,7 +182,7 @@ export default async function handler(req,res) {
       username:account?.username??null,
       discordUsername:user.discordUsername,
       discordAvatar:user.discordAvatar,
-      guideAccess,admin:user.admin,patchnotesAdmin:canEditPatchnotes(user),discordLinked:!!user.discordId,stockPath:ownerStockPath(user)
+      guideAccess,homeEditor:canEditHomepage(user),admin:user.admin,patchnotesAdmin:canEditPatchnotes(user),discordLinked:!!user.discordId,stockPath:ownerStockPath(user)
     }:null});
     }
     if(path==='/api/admin/accounts'&&req.method==='GET'){

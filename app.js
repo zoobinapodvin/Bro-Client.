@@ -19,7 +19,7 @@ async function requestOverview(){
  const pending=(async()=>{const r=await fetch('/api/account/overview',{cache:'no-store'});if(!r.ok)throw Error('overview');const value=await r.json();if(epoch!==sessionEpoch||!user)throw Error('session_changed');preloadedOverview=value;overviewAt=Date.now();return value;})();
  overviewRequest=pending;try{return await pending;}finally{if(overviewRequest===pending)overviewRequest=null;}
 }
-function syncGuideNavigation(){document.querySelectorAll('[data-paid-guides]').forEach(el=>{el.hidden=user?.guideAccess!==true;});}
+function syncGuideNavigation(){document.querySelectorAll('[data-paid-guides]').forEach(el=>{el.hidden=user?.guideAccess!==true;});window.dispatchEvent(new Event('bro-session-changed'));}
 const block = (tag, text, cls) => {
   const el = document.createElement(tag);
   if(text !== undefined) el.textContent = text;
@@ -63,7 +63,8 @@ function render(){
     price.append(block('strong',new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(plan.price)+' €'),block('small','paiement unique'));
     card.append(row,block('h3',plan.name),block('p',plan.description),price,button(c.planButton,()=>checkout(plan),'btn plan-button')); return card;
   }));
-  $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');el.append(block('summary',c['q'+i]),block('p',c['a'+i]));return el;}));
+  $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');const title=block('summary',c['q'+i]),text=block('p',c['a'+i]);title.dataset.homeField='title';text.dataset.homeField='text';el.append(title,text);if(document.querySelector('[data-home-block="faq-heading"]')){const wrap=block('div',undefined,'home-faq-item');wrap.dataset.homeBlock='faq-'+i;wrap.dataset.homeLabel='Question '+i;wrap.append(el);return wrap;}return el;}));
+  window.dispatchEvent(new Event('bro-home-render'));
 }
 function openDialog(title) {
   modal.classList.remove('editing','client-portal','client-portal-compact');body.classList.remove('client-portal-body');body.replaceChildren();
