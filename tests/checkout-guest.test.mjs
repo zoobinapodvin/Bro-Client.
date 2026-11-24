@@ -43,11 +43,10 @@ test('checkout UI and explanatory text require Discord',()=>{
  assert.match(config.content.a3,/Oui\. Connecte-toi avec Discord/);
 });
 
-test('production authenticated checkout restores all four official links on Whop 403',async()=>{
+test('production authenticated checkout fails closed on Whop 403',async()=>{
  const user={id:'verified-user',discordId:'1574096900000000001'};
  for(const plan of config.plans){
-   const result=await authenticatedCheckoutDestination({},user,plan,'https://www.broclient.com',async()=>{throw Error('whop_api_403')});
-   assert.deepEqual(result,{url:plan.checkoutUrl,attributed:false});
+   await assert.rejects(authenticatedCheckoutDestination({},user,plan,'https://www.broclient.com',async()=>{throw Error('whop_api_403')}),/whop_api_403/);
  }
 });
 test('production checkout preserves attributed success, rejects guests and fails closed on integrity errors',async()=>{
@@ -61,21 +60,19 @@ test('production checkout preserves attributed success, rejects guests and fails
  assert.match(src,/return res\.redirect\(302,result\.url\)/);
 });
 
-test('new product URLs redirect exactly, only after Discord authentication, with no checkout API call',async()=>{
- const expected={"day":"https://whop.com/modelya/bro-client-1-jour-51","week":"https://whop.com/modelya/bro-client-1-semaine-a7","month":"https://whop.com/modelya/bro-client-1-mois-be/","life":"https://whop.com/modelya/bro-client-lifetime/"};
+test('all new plans use authenticated dynamic checkouts and no fallback',async()=>{
+ const expected={"day":"https://whop.com/checkout/plan_2XsZR1EchcSOj","week":"https://whop.com/checkout/plan_sIer2uLNR0Idi","month":"https://whop.com/checkout/plan_jzDhXvlF2aSQc","life":"https://whop.com/checkout/plan_3G7GUcXlBFZJX"};
  const user={id:'verified-user',discordId:'1574096900000000001'};
  for(const plan of config.plans){
   assert.equal(plan.checkoutUrl,expected[plan.id]);
-  let called=false;
-  const result=await authenticatedCheckoutDestination({},user,plan,'https://www.broclient.com',async()=>{called=true;throw Error('must not run');});
-  assert.equal(called,false);
-  assert.deepEqual(result,{url:expected[plan.id],attributed:false});
+  const result=await authenticatedCheckoutDestination({},user,plan,'https://www.broclient.com',async(env,verified,offer)=>{assert.equal(verified.discordId,user.discordId);assert.equal(offer.checkoutUrl,expected[plan.id]);return 'https://whop.com/checkout/ch_1234';});
+  assert.deepEqual(result,{url:'https://whop.com/checkout/ch_1234',attributed:true});
   await assert.rejects(authenticatedCheckoutDestination({},null,plan,'https://www.broclient.com',async()=>{}),/discord_session_required/);
  }
 });
 test('old persisted checkout URLs migrate while preserving other storefront settings',async()=>{
  const {readSite,validCheckout}=await import('../lib/store.mjs');
- const saved={...config,checkoutLinksVersion:1,plans:config.plans.map(p=>({...p,checkoutUrl:legacyPlan.checkoutUrl,description:'custom'}))};
+ const saved={...config,checkoutLinksVersion:2,plans:config.plans.map(p=>({...p,checkoutUrl:legacyPlan.checkoutUrl,description:'custom'}))};
  const bucket={get:async()=>({etag:'old',json:async()=>saved})};
  const {site}=await readSite(bucket);
  assert.deepEqual(site.plans.map(p=>p.checkoutUrl),config.plans.map(p=>p.checkoutUrl));
@@ -83,6 +80,6 @@ test('old persisted checkout URLs migrate while preserving other storefront sett
  assert.ok(site.plans.every(p=>validCheckout(p.checkoutUrl)));
  assert.equal(validCheckout('https://evil.invalid/modelya/test'),false);
  assert.equal(validCheckout('https://whop.com/modelya/test?redirect=evil'),false);
- saved.checkoutLinksVersion=2;
+ saved.checkoutLinksVersion=3;
  assert.equal((await readSite(bucket)).site.plans[0].checkoutUrl,legacyPlan.checkoutUrl);
 });

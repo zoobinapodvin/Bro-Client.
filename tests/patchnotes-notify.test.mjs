@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {canEditPatchnotes,editPatchnote,listPatchnotes,readPatchnote} from '../lib/patchnotes.mjs';
 import {reconcilePaymentNotifications,notifyVerifiedPurchase} from '../lib/purchase-notify.mjs';
 
+process.env.WHOP_ACCOUNT_ID='biz_emxZArodB6p2Af';
 const makeBucket=()=>{
  const data=new Map();let counter=0;
  return {
@@ -122,3 +123,4 @@ test('patchnotes routes and mobile design are included in the production build',
  const offers=readFileSync(new URL('../offres.html',import.meta.url),'utf8');
  assert.match(offers,/data-patchnote-banner/);
 });
+

@@ -6,6 +6,7 @@ import {
  backfillWhopHistory
 } from '../lib/activity.mjs';
 
+process.env.WHOP_ACCOUNT_ID='biz_emxZArodB6p2Af';
 const discordId='1574096900000000001';
 const payment=(id,date,productId='prod_ZrNuFIODHTxMx')=>({
  id,paid_at:date,status:'paid',account_id:'biz_emxZArodB6p2Af',
@@ -168,3 +169,4 @@ test('homepage has a discreet, compact animated feed without repeated sales copy
  assert.match(js,/purchase\.name\.replace\(\/#\\d\{1,4\}\$\//);
  assert.match(js,/purchase-card-new/);
 });
+

@@ -25,7 +25,7 @@ test('all four official public prices and distinct checkout URLs',()=>{
  const expected={day:6,week:15,month:35,life:100};
  assert.deepEqual(Object.fromEntries(defaults.plans.map(p=>[p.id,p.price])),expected);
  assert.equal(new Set(defaults.plans.map(p=>p.checkoutUrl)).size,4);
- assert.deepEqual(Object.fromEntries(defaults.plans.map(p=>[p.id,p.checkoutUrl])),{"day":"https://whop.com/modelya/bro-client-1-jour-51","week":"https://whop.com/modelya/bro-client-1-semaine-a7","month":"https://whop.com/modelya/bro-client-1-mois-be/","life":"https://whop.com/modelya/bro-client-lifetime/"});
+ assert.deepEqual(Object.fromEntries(defaults.plans.map(p=>[p.id,p.checkoutUrl])),{"day":"https://whop.com/checkout/plan_2XsZR1EchcSOj","week":"https://whop.com/checkout/plan_sIer2uLNR0Idi","month":"https://whop.com/checkout/plan_jzDhXvlF2aSQc","life":"https://whop.com/checkout/plan_3G7GUcXlBFZJX"});
 });
 test('lifetime entitlement is preserved alongside expired temporary passes',async()=>{
  const old=new Date(Date.now()-86400000).toISOString();

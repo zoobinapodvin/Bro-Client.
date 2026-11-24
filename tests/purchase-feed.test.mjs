@@ -4,6 +4,7 @@ import {createHmac} from 'node:crypto';
 import {normalizePayment,backfillWhopHistory,recentPurchases,setActivityPreference} from '../lib/activity.mjs';
 import {handleBilling,createCheckout,attachVerifiedPayment,recoverAttributedPayment} from '../lib/billing.mjs';
 
+process.env.WHOP_ACCOUNT_ID='biz_emxZArodB6p2Af';
 const company='biz_emxZArodB6p2Af';
 const payment=(overrides={})=>({
  id:'pay_TESTabc123',status:'paid',company:{id:company},
@@ -234,3 +235,4 @@ test('automatic recovery never links a receipt with no server order',async()=>{
  assert.equal(await recoverAttributedPayment({BUCKET:b,WHOP_ACCOUNT_ID:company},payment()),false);
  assert.equal([...b.map.keys()].filter(k=>k.startsWith('private/discord-entitlements/')).length,0);
 });
+
