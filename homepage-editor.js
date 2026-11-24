@@ -4,7 +4,7 @@ const $=s=>document.querySelector(s),all=s=>Array.from(document.querySelectorAll
 let current=null,checking=false,publishing=false,pendingReload=false;
 const editorDialog=node('dialog',undefined,'home-edit-dialog');
 editorDialog.setAttribute('aria-label','Édition du contenu');document.body.append(editorDialog);
-const endpoint='/api/homepage',imageIds=/^(hero-image|(?:access|scope|club|faq|offer-access)-\d+|offer-plan-(?:day|week|month|life))$/;
+const endpoint='/api/homepage',imageIds=/^(hero-image|(?:access|scope|club|faq|offer-access|compat)-\d+|offer-plan-(?:day|week|month|life))$/;
 const fieldNames={eyebrow:'Surtitre',title:'Titre',title1:'Titre · ligne 1',title2:'Titre · ligne 2',text:'Texte',primary:'Bouton principal',secondary:'Bouton secondaire',cta:'Bouton',image:'Image',item1:'Point clé 1',item2:'Point clé 2'};
 const isOwner=()=>typeof user!=='undefined'&&user?.homeEditor===true;
 const fieldNodes=el=>Array.from(el.querySelectorAll('[data-home-field]')).filter(n=>n.closest('[data-home-block]')===el);
@@ -12,7 +12,7 @@ function imageFor(el,value){
  if(el.dataset.homeBlock.startsWith('offer-plan-')){el.style.setProperty('--offer-custom-art',value?'url('+JSON.stringify(value)+')':'none');el.dataset.offerArtwork='custom';return;}
  const bg=el.querySelector('[data-home-background]');if(bg){if(value)bg.style.backgroundImage='url('+JSON.stringify(value)+')';else bg.style.backgroundImage='none';return;}
  let img=el.querySelector(':scope > .home-card-image');if(!value){img?.remove();return;}
- if(!img){img=node('img',undefined,'home-card-image');img.alt='';img.loading='lazy';img.decoding='async';const target=el.querySelector(':scope > h3')||el.firstElementChild;el.insertBefore(img,target||null);}
+ if(!img){img=node('img',undefined,'home-card-image');img.alt='';img.loading='lazy';img.decoding='async';const target=el.querySelector(':scope > h3')||el.firstElementChild;if(el.dataset.homeBlock.startsWith('compat-'))el.append(img);else el.insertBefore(img,target||null);}
  if(img.getAttribute('src')!==value)img.src=value;
 }
 function apply(){
