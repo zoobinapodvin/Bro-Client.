@@ -391,10 +391,11 @@ async function loadInvoices(target,cursor) {
       const amount=new Intl.NumberFormat('fr-FR',{style:'currency',currency:invoice.currency||'EUR'}).format(invoice.amount);
       row.append(block('p',[Number.isNaN(date.valueOf())?'':date.toLocaleDateString('fr-FR'),amount].filter(Boolean).join(' · ')));
       if(/^pay_[A-Za-z0-9]+$/.test(invoice.id)){
-        const ref=block('p','Référence Whop · '+invoice.id);
+        const reference=invoice.provider==='tebex'?invoice.transactionId:invoice.id;
+        const ref=block('p',(invoice.provider==='tebex'?'Référence Tebex · ':'Référence Whop · ')+reference);
         const copy=button('Copier la référence',async()=>{
-          try{await navigator.clipboard.writeText(invoice.id);copy.textContent='Référence copiée';}
-          catch{ref.textContent='Référence à copier : '+invoice.id;}
+          try{await navigator.clipboard.writeText(reference);copy.textContent='Référence copiée';}
+          catch{ref.textContent='Référence à copier : '+reference;}
         });
         const support=link('Contacter le vendeur','/informations.html#assistance','portal-small-link');
         support.target='_blank';support.rel='noopener noreferrer';
@@ -584,7 +585,7 @@ function renderRecentFeed(data){
   if(personal){username.classList.add(purchase.planId==='life'||purchase.plan==='Pass Lifetime'?'purchase-name-lifetime':'purchase-name-customer');username.title=pseudo;}
   buyer.append(photo,username);
   const name=block('span',purchase.plan||'Pass Bro Client','purchase-card-product');
-  const amount=block('strong',currency.format(purchase.amount),'purchase-card-price');
+  const amount=block('strong',new Intl.NumberFormat('fr-FR',{style:'currency',currency:/^[A-Z]{3}$/.test(purchase.currency||'')?purchase.currency:'EUR'}).format(purchase.amount),'purchase-card-price');
   const when=block('time',datetime.format(new Date(purchase.date)).replace(',',' ·'),'purchase-card-date');
   when.dateTime=purchase.date;
   when.title='Paiement confirmé';

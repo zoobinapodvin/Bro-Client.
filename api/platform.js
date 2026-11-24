@@ -12,13 +12,14 @@ import {accountOverview,readCustomerKey,ownerStockPath,stockOverview,addStockKey
 import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary,rebuildRecentIndex} from '../lib/activity.mjs';
 import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
 import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
+import {completeTebexPayment} from '../lib/tebex.mjs';
 import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides,CUSTOMER_GUIDES_KEY} from '../lib/customer-guides.mjs';
 // Profile persistence must never block authentication or the checkout route.
 async function rememberAccount(user){
  try{return await registerAccount(bucket,user);}catch(error){console.error('Bro account registry unavailable',error?.name);return null;}
 }
-// Temporary pause requested by the owner. Resume only on explicit instruction.
-process.env.BRO_KEY_DELIVERY_PAUSED ??= 'true';
+// Owner explicitly resumed confirmed-payment fulfillment. Emergency env override remains available.
+process.env.BRO_KEY_DELIVERY_PAUSED ??= 'false';
 const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET,WHOP_CHECKOUT_API_KEY:process.env.WHOP_CHECKOUT_API_KEY};
 async function body(req,max) {
   const chunks=[];let size=0;
@@ -38,7 +39,7 @@ export default async function handler(req,res) {
   const route=parsed.searchParams.get('route')??parsed.pathname.slice(1);
   const path='/'+route;
   try {
-    // Tebex endpoint: signed validation only. Payments and delivery remain disabled.
+    // Tebex endpoint: validate the raw signature before processing any event.
     if(path==='/api/webhooks/tebex'){
       if(req.method!=='POST'){
         res.setHeader('Allow','POST');
@@ -57,8 +58,8 @@ export default async function handler(req,res) {
       const event=JSON.parse(raw.toString('utf8'));
       if(event?.type==='validation.webhook'&&typeof event.id==='string'&&event.id.length>0&&event.id.length<=200)
         return res.status(200).json({id:event.id});
-      // Do not acknowledge or fulfill real payment events until separately enabled.
-      return res.status(503).json({error:'Payment processing disabled'});
+      const result=await completeTebexPayment(bucket,event);
+      return res.status(result.status).json(result.body);
     }
     if(path==='/api/ops/reconcile-sales'&&req.method==='POST'){
       const token=process.env.BRO_SALES_RECONCILE_TOKEN;
