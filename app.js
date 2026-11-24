@@ -605,43 +605,65 @@ if(location.pathname==='/offres'&&new URLSearchParams(location.search).get('paie
 }
 async function displayGuideCatalogue(root){
  const title=root.querySelector('h1'),list=root.querySelector('section');
+ const guides=[
+  {id:'avant-de-commencer',category:'PRÉPARATION',title:'Avant de commencer',subtitle:'Vérifie les prérequis Windows et prépare ton environnement avant l’installation.',time:'4 min',steps:[
+   {title:'Vérifie ta version de Windows',body:'Appuie sur Windows + R, saisis winver puis valide. Compare la version et le numéro de build avec les prérequis communiqués pour ton produit.'},
+   {title:'Vérifie la compatibilité',body:'Si FACEIT Anti-Cheat ou Riot Vanguard est installé, demande au support de confirmer la compatibilité. Consulte aussi le statut des services avant de commencer.',links:[['Statut des services','https://stratx.ac/status']]},
+   {title:'Installe les composants nécessaires',body:'Télécharge les composants depuis leurs sources officielles. Redémarre Windows si l’installation te le demande.',links:[['Microsoft Visual C++ Redistributable x64','https://aka.ms/vc14/vc_redist.x64.exe'],['Microsoft DirectX Runtime','https://www.microsoft.com/en-us/download/details.aspx?id=35'],['WinRAR','https://www.win-rar.com/download.html']]},
+   {title:'Prépare ton environnement',body:'Ferme le jeu et les applications ou overlays inutiles. Vérifie la date et l’heure de Windows. Récupère la version actuelle depuis ton espace client et extrais complètement les fichiers compressés.'},
+   {title:'En cas de blocage Windows',body:'Consulte l’historique de protection pour comprendre le blocage, puis contacte le support avant toute manipulation. Ne modifie pas les paramètres de sécurité de Windows ou du BIOS sans en connaître les conséquences.'}
+  ]},
+  {id:'assistance',category:'SUPPORT',title:'Préparer une demande d’assistance',subtitle:'Les informations à transmettre pour obtenir une réponse plus rapide.',time:'2 min',steps:[
+   {title:'Identifier le produit',body:'Indique le produit et la durée du pass concernés.'},
+   {title:'Décrire le problème',body:'Précise ta version de Windows, l’action effectuée et le message d’erreur exact.'},
+   {title:'Joindre une capture',body:'Masque ta clé et tes identifiants avant de joindre la capture au ticket.'},
+   {title:'Ouvrir un ticket',body:'Transmets ces éléments au support technique dans un ticket privé.'}
+  ]}
+ ];
  const selected=new URLSearchParams(location.search).get('guide');
- if(selected==='assistance'){
-   root.classList.add('guide-detail');
-   root.querySelector('a').href='/guides';root.querySelector('a').textContent='← Tous les guides';
-   title.textContent='Préparer une demande d’assistance';
-   const steps=[
-     ['Identifier le produit','Indique le produit et la durée du pass concernés.'],
-     ['Décrire le problème','Précise ta version de Windows, l’action effectuée et le message d’erreur exact.'],
-     ['Joindre une capture','Masque ta clé et tes identifiants avant de joindre la capture au ticket.'],
-     ['Ouvrir un ticket','Transmets ces éléments au support technique dans un ticket privé.']
-   ];
-   const progress=block('p','0 étape sur 4 terminée');progress.setAttribute('role','status');
-   const meter=document.createElement('progress');meter.max=steps.length;meter.value=0;meter.setAttribute('aria-label','Progression');
-   const aside=block('aside');title.after(aside);aside.append(title,progress,meter);
-   steps.forEach(([heading,description],index)=>{
-     const row=block('article'),label=block('label'),check=document.createElement('input');check.type='checkbox';
-     label.append(check,' '+String(index+1).padStart(2,'0')+' · '+heading);
-     row.append(label,block('p',description));list.append(row);
-     check.onchange=()=>{meter.value=list.querySelectorAll(':checked').length;progress.textContent=meter.value+' / '+steps.length+' étapes terminées';};
-   });
-   list.append(link('Contacter le support Discord','https://discord.gg/uRQyKBhhgA','btn cyan'));return;
- }
- if(selected===null)list.append(link('Préparer une demande d’assistance','/guides?guide=assistance','guide-entry'));
- try{
-  const response=await fetch('/api/guides',{cache:'no-store'});
-  if(response.status===401){list.append(link('Ouvrir mon espace client','/#compte','btn cyan'));return}
-  if(!response.ok)throw Error();
-  const {guides}=await response.json();
-  if(selected!==null){
-   const guide=guides.find((item,index)=>String(index)+'-'+item.title===selected);
-   title.textContent=guide?.title||'Guide introuvable';
-   if(guide)list.append(block('p',guide.body,'guide-body'));
-   list.append(link('Tous les guides','/guides'));return;
+ if(selected){
+  const guide=guides.find(item=>item.id===selected);
+  root.classList.add('guide-detail');
+  root.querySelector('a').href='/guides';root.querySelector('a').textContent='← Tous les guides';
+  if(!guide){title.textContent='Guide introuvable';return}
+  title.textContent=guide.title;
+  const intro=create('p',guide.subtitle,'guide-intro');
+  const meta=create('span',guide.category+' · '+guide.time,'guide-meta');
+  const top=create('div',undefined,'guide-detail-head');
+  top.append(meta,title,intro);root.querySelector('a').after(top);
+  list.replaceChildren();
+  const sidebar=create('aside',undefined,'guide-sidebar');
+  sidebar.append(create('span','DANS CE GUIDE','guide-meta'));
+  const nav=create('nav',undefined,'guide-toc');nav.setAttribute('aria-label','Sommaire du guide');
+  const content=create('div',undefined,'guide-content');
+  guide.steps.forEach((step,index)=>{
+    const id='section-'+(index+1);
+    nav.append(link(String(index+1).padStart(2,'0')+'  '+step.title,'#'+id));
+    const section=create('section',undefined,'guide-step');section.id=id;
+    section.append(create('span',String(index+1).padStart(2,'0'),'guide-step-number'),create('h2',step.title),create('p',step.body));
+    if(step.links){const links=create('div',undefined,'guide-downloads');step.links.forEach(([label,url])=>{const anchor=link(label,url);anchor.target='_blank';anchor.rel='noopener noreferrer';links.append(anchor)});section.append(links)}
+    content.append(section);
+  });
+  sidebar.append(nav);list.className='guide-layout';list.append(sidebar,content);
+  if(guide.id==='avant-de-commencer'){
+   const next=create('aside',undefined,'guide-next');
+   next.append(create('strong','Prêt à continuer ?'),create('p','Une fois les prérequis vérifiés, consulte le parcours d’assistance ou contacte notre équipe si tu as une question sur la compatibilité.'),link('Préparer une demande d’assistance','/guides?guide=assistance','btn ghost'));
+   content.append(next);
   }
-  for(const [index,guide] of guides.entries())list.append(link(guide.title,'/guides?guide='+encodeURIComponent(index+'-'+guide.title),'guide-entry'));
-
- }catch{list.append(block('p','Les guides sont momentanément indisponibles.'))}
+  return;
+ }
+ root.classList.remove('guide-detail');
+ title.textContent='Guides et ressources';
+ const intro=create('p','Des repères clairs pour préparer ton environnement et trouver de l’aide.','guide-library-intro');
+ root.querySelector('a').after(intro);
+ list.replaceChildren();
+ const grid=create('div',undefined,'guide-grid');
+ for(const guide of guides){
+  const card=link('','/guides?guide='+guide.id,'guide-card');
+  card.append(create('span',guide.category,'guide-meta'),create('h2',guide.title),create('p',guide.subtitle),create('span','Lire le guide · '+guide.time+' →','guide-card-action'));
+  grid.append(card);
+ }
+ list.append(grid);
 }
 const guideCatalogue=document.querySelector('#guide-catalogue');
 if(guideCatalogue)displayGuideCatalogue(guideCatalogue);

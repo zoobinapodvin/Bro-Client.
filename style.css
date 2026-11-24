@@ -782,3 +782,34 @@ body.guides-page{min-height:100vh;min-height:100dvh;display:flex;flex-direction:
 .guide-detail progress{width:100%;accent-color:#a4c5df}
 .guide-detail article{border-top:1px solid #374553;padding:20px 0}.guide-detail article label{font-weight:650;cursor:pointer}.guide-detail article p{color:#bdc9d8;line-height:1.65}
 @media(max-width:700px){#guide-catalogue.guide-detail{grid-template-columns:minmax(0,1fr);row-gap:12px}.guide-detail aside{margin-bottom:16px}.guide-detail>a{margin-bottom:12px}}
+
+#guide-catalogue{max-width:1120px;padding:clamp(36px,7vw,86px) 0}
+#guide-catalogue>h1{font-size:clamp(36px,5vw,64px);letter-spacing:-.045em;margin:14px 0}
+.guide-library-intro,.guide-intro{color:#aebdce;max-width:680px;line-height:1.7}
+.guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:36px}
+.guide-card{display:flex;min-height:240px;flex-direction:column;gap:13px;padding:26px;text-decoration:none!important;border:1px solid #34475d;border-radius:16px;background:linear-gradient(145deg,#1c2938,#151d28);transition:transform .18s,border-color .18s}
+.guide-card:hover{transform:translateY(-3px);border-color:#a7c4df}
+.guide-meta{font-size:11px;letter-spacing:.14em;color:#abc1d7;font-weight:700}
+.guide-card h2{margin:0;font-size:24px;letter-spacing:-.025em}
+.guide-card p{margin:0;color:#b5c1d0;line-height:1.65}
+.guide-card-action{margin-top:auto;color:#c1d5e9;font-weight:650}
+#guide-catalogue.guide-detail{max-width:1120px;display:block}
+.guide-detail>a{display:inline-block;margin-bottom:30px}
+.guide-detail-head{max-width:790px;margin-bottom:38px}
+.guide-detail-head h1{margin:14px 0;font-size:clamp(34px,5vw,58px);letter-spacing:-.045em}
+.guide-intro{font-size:17px}
+.guide-layout{display:grid;grid-template-columns:230px minmax(0,720px);gap:clamp(28px,6vw,76px);align-items:start}
+.guide-sidebar{position:sticky;top:32px;padding:20px;border:1px solid #34475d;border-radius:14px;background:#17212d}
+.guide-toc{display:grid;gap:8px;margin-top:14px}
+.guide-toc a{padding:9px 10px;border-radius:8px;color:#b9c7d7;text-decoration:none;font-size:13px;line-height:1.4}
+.guide-toc a:hover{background:#253448;color:white}
+.guide-content{min-width:0}
+.guide-step{position:relative;padding:0 0 28px 54px;margin-bottom:28px;border-bottom:1px solid #34404d}
+.guide-step-number{position:absolute;left:0;top:2px;width:36px;height:36px;display:grid;place-items:center;border:1px solid #536980;border-radius:50%;color:#c4d9ed;font-size:12px}
+.guide-step h2{margin:0 0 12px;font-size:21px;letter-spacing:-.02em}
+.guide-step p{margin:0;color:#bbc7d5;line-height:1.8;white-space:pre-line}
+.guide-downloads{display:grid;gap:9px;margin-top:17px}
+.guide-downloads a{display:inline-flex;width:fit-content;padding:10px 14px;border:1px solid #536980;border-radius:9px;color:#c5d9ec;text-decoration:none}
+.guide-next{margin-top:26px;padding:22px;border:1px solid #40536a;border-radius:14px;background:#182636}
+.guide-next p{color:#b8c6d6;line-height:1.65}
+@media(max-width:700px){.guide-grid{grid-template-columns:1fr;gap:12px}.guide-card{min-height:195px;padding:21px}.guide-layout{grid-template-columns:minmax(0,1fr);gap:18px}.guide-sidebar{position:static}.guide-toc{grid-template-columns:1fr}.guide-step{padding-left:44px}.guide-step-number{width:30px;height:30px}.guide-step h2{font-size:19px}}
