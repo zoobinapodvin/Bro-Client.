@@ -37,7 +37,7 @@ test('invalid or off-domain checkout links cannot be injected',async()=>{
 test('checkout UI and explanatory text require Discord',()=>{
  const src=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
  const site=readFileSync(new URL('../offres.html',import.meta.url),'utf8');
- assert.match(src,/if\(!user\?\.discordId\)/);
+ assert.match(src,/if\(!user\?\.discordId\|\|/);
  assert.doesNotMatch(src,/return res\.redirect\(302,target\.href\)/);
  assert.match(site,/Connexion Discord requise/);
  assert.match(config.content.a3,/Oui\. Connecte-toi avec Discord/);
@@ -56,8 +56,8 @@ test('production checkout preserves attributed success, rejects guests and fails
  await assert.rejects(authenticatedCheckoutDestination({},user,plan,'https://www.broclient.com',async()=>{throw Error('checkout_price_mismatch')}),/checkout_price_mismatch/);
  await assert.rejects(authenticatedCheckoutDestination({},user,{...plan,checkoutUrl:'https://evil.invalid/checkout/plan_123'},'https://www.broclient.com',async()=>{throw Error('whop_api_403')}),/Invalid official/);
  const src=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
- assert.match(src,/await authenticatedCheckoutDestination\(billingEnv,user,plan/);
- assert.match(src,/return res\.redirect\(302,result\.url\)/);
+ assert.match(src,/https:\/\/headless\.tebex\.io\/api/);
+ assert.match(src,/return res\.redirect\(303,target\.href\)/);
 });
 
 test('all new plans use authenticated dynamic checkouts and no fallback',async()=>{
@@ -82,4 +82,43 @@ test('old persisted checkout URLs migrate while preserving other storefront sett
  assert.equal(validCheckout('https://whop.com/modelya/test?redirect=evil'),false);
  saved.checkoutLinksVersion=3;
  assert.equal((await readSite(bucket)).site.plans[0].checkoutUrl,legacyPlan.checkoutUrl);
+});
+
+test('Tebex checkout selects the exact package for each pass, stores attribution and rejects guests and off-domain links',async()=>{
+ const src=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
+ const start=src.indexOf("    if(/^\\/checkout\\/(day|week|month|life)$/.test(path)&&req.method==='GET'){");
+ const end=src.indexOf("\n    return res.status(404).end();",start);
+ assert.ok(start>=0&&end>start);
+ const {runInNewContext}=await import('node:vm');
+ const {createHash,randomUUID}=await import('node:crypto');
+ const mapping={day:'7832046',week:'7832045',month:'7832044',life:'7832042'};
+ const run=async(plan,user,checkout='https://checkout.tebex.io/checkout/test-basket-123')=>{
+  const calls=[],orders=[],redirects=[];
+  const context={path:'/checkout/'+plan,req:{method:'GET'},user,process:{env:{TEBEX_PUBLIC_TOKEN:'test-token',TEBEX_WEBHOOK_SECRET:'test-secret'}},crypto:{randomUUID},createHash,URL,AbortSignal,
+    console:{error(){}},bucket:{put:async(k,v,o)=>{orders.push({k,record:JSON.parse(v),o});return {etag:'saved'};}},
+    fetch:async(url,opts)=>{calls.push({url,body:JSON.parse(opts.body)});return {ok:true,json:async()=>calls.length===1?{data:{ident:'test-basket-123'}}:{ident:'test-basket-123',complete:false,links:{checkout}}};},
+    res:{setHeader(){},redirect:(status,url)=>{redirects.push({status,url});return url;}}};
+  await runInNewContext('(async()=>{'+src.slice(start,end)+'})()',context);
+  return {calls,orders,redirects};
+ };
+ const verified={id:'verified-user',discordId:'1574096900000000001'};
+ for(const [plan,packageId] of Object.entries(mapping)){
+  const r=await run(plan,verified);
+  assert.equal(r.calls.length,2);
+  assert.equal(r.calls[1].body.package_id,packageId);
+  assert.equal(r.calls[1].body.quantity,1);
+  assert.equal(r.orders.length,1);
+  assert.equal(r.orders[0].record.discordId,verified.discordId);
+  assert.equal(r.orders[0].record.packageId,packageId);
+  assert.equal(r.orders[0].record.basketId,'test-basket-123');
+  assert.ok(r.orders[0].k.includes(r.calls[0].body.custom.bro_order));
+  assert.equal(r.orders[0].o.onlyIf.etagDoesNotMatch,'*');
+  assert.equal(r.redirects[0].url,'https://checkout.tebex.io/checkout/test-basket-123');
+ }
+ const guest=await run('day',null);
+ assert.equal(guest.calls.length,0);
+ assert.match(guest.redirects[0].url,/^\/auth\/discord\?/);
+ const invalid=await run('day',verified,'https://evil.invalid/checkout/test');
+ assert.equal(invalid.orders.length,0);
+ assert.equal(invalid.redirects[0].url,'/offres?paiement=indisponible');
 });
