@@ -6,7 +6,7 @@ import {authenticatedCheckoutDestination,validWhopPlan} from '../lib/checkout.mj
 import {registerAccount,listAccounts,findAccount,readAccount} from '../lib/accounts.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
-import {accountOverview,readCustomerKey} from '../lib/fulfillment.mjs';
+import {accountOverview,readCustomerKey,ownerStockPath,stockOverview,addStockKey} from '../lib/fulfillment.mjs';
 import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary} from '../lib/activity.mjs';
 import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
 import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
@@ -126,6 +126,21 @@ export default async function handler(req,res) {
       res.setHeader('Content-Type',img.httpMetadata.contentType);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.end(Buffer.from(await new Response(img.body).arrayBuffer()));
     }
     const user=isWebhook?null:await session(req,res);
+    if(path.startsWith('/gestion-cles/')){
+      const privatePath=ownerStockPath(user);
+      if(!privatePath||!(path===privatePath||path===privatePath+'/stock'))return res.status(404).end();
+      res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Robots-Tag','noindex, nofollow');
+      if(path===privatePath&&req.method==='GET'){
+        res.setHeader('Content-Type','text/html; charset=utf-8');
+        return res.end('<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>BRO. · Stock privé</title><link rel="stylesheet" href="/key-stock.css"><script defer src="/key-stock.js"></script></head><body><main><header><a href="/#compte">← Espace client</a><small>ACCÈS PROPRIÉTAIRE · PRIVÉ</small><h1>Gestion des clés</h1><p>Stock chiffré · Attribution par paiement vérifié</p></header><section id="summary" class="summary"></section><section><h2>Ajouter une clé</h2><form id="stock-form"><label>Pass<select id="plan"><option value="day">1 jour</option><option value="week">1 semaine</option><option value="month">1 mois</option><option value="life">Lifetime</option></select></label><label>Clé<input id="key" type="password" autocomplete="off" required minlength="5" maxlength="256"></label><button>Ajouter au stock</button></form><p id="status" role="status"></p></section><section><h2>Commandes en attente</h2><div id="pending"></div></section><section><h2>Inventaire</h2><div class="filters"><select id="filter"><option value="all">Tous les pass</option><option value="day">1 jour</option><option value="week">1 semaine</option><option value="month">1 mois</option><option value="life">Lifetime</option></select><select id="state"><option value="all">Tous les statuts</option><option value="available">Disponible</option><option value="assigned">Attribuée</option><option value="expired">Expirée</option><option value="legacy">Historique</option></select><button id="refresh" type="button">Actualiser</button></div><div id="inventory"></div></section></main></body></html>');
+      }
+      if(path===privatePath+'/stock'&&req.method==='GET')return res.json(await stockOverview(bucket));
+      if(path===privatePath+'/stock'&&req.method==='POST'){
+        const input=JSON.parse(payload.toString());const result=await addStockKey(bucket,{planId:input.planId,key:input.key,operatorId:user.discordId});
+        return res.status(result.status==='added'?201:result.status==='duplicate'?409:422).json(result);
+      }
+      return res.status(405).end();
+    }
     if(path==='/api/patchnotes' || /^\/api\/patchnotes\/[a-z0-9-]+$/.test(path)){
       const editor=canEditPatchnotes(user);
       res.setHeader('Cache-Control','no-store');
@@ -148,7 +163,7 @@ export default async function handler(req,res) {
       username:account?.username??null,
       discordUsername:user.discordUsername,
       discordAvatar:user.discordAvatar,
-      admin:user.admin,patchnotesAdmin:canEditPatchnotes(user),discordLinked:!!user.discordId
+      admin:user.admin,patchnotesAdmin:canEditPatchnotes(user),discordLinked:!!user.discordId,stockPath:ownerStockPath(user)
     }:null});
     }
     if(path==='/api/admin/accounts'&&req.method==='GET'){
@@ -201,12 +216,12 @@ export default async function handler(req,res) {
     }
     if(path==='/api/account/key'&&req.method==='GET'){
       if(!user?.discordId)return res.status(401).end();
-      const key=await readCustomerKey(bucket,user.discordId);
+      const key=await readCustomerKey(bucket,user.discordId,parsed.searchParams.get('payment'));
       return key?res.json({key}):res.status(404).json({error:'Clé indisponible.'});
     }
     if(path==='/api/account/key.txt'&&req.method==='GET'){
       if(!user?.discordId)return res.status(401).end();
-      const key=await readCustomerKey(bucket,user.discordId);
+      const key=await readCustomerKey(bucket,user.discordId,parsed.searchParams.get('payment'));
       if(!key)return res.status(404).end();
       res.setHeader('Content-Type','text/plain; charset=utf-8');
       res.setHeader('Content-Disposition','attachment; filename="BroClient-key.txt"');

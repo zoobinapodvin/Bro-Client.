@@ -225,35 +225,25 @@ async function account(){
         block('span',last?.planId==='life'?'Accès à vie':'Actif','client-tag-active'));
       viewport.append(pass);
       viewport.append(block('p','La distribution du launcher a été arrêtée. Pour toute question concernant un achat antérieur, contacte le support.','client-quiet'));
-      if(overview.keyAvailable){
+      for(const purchase of active){
         const keyRow=block('div',undefined,'portal-key-row');
-        keyRow.append(block('span','MA CLÉ','client-kicker'));
-        const input=block('input');input.type='text';input.readOnly=true;input.value='•••• •••• •••• ••••';
-        input.setAttribute('aria-label','Clé d’activation');
-        input.className='portal-key-input';
-        keyRow.append(input);
-        const actions=block('div',undefined,'portal-key-actions');
-        const reveal=smallButton('Afficher',async()=>{
-          try{
-            const r=await fetch('/api/account/key',{cache:'no-store'});
-            if(!r.ok)throw Error();const data=await r.json();input.value=data.key;input.title=data.key;
-          }catch{status('Clé momentanément indisponible.');}
-        });
-        const copy=smallButton('Copier',async()=>{
-          try{
-            const r=await fetch('/api/account/key',{cache:'no-store'});
-            if(!r.ok)throw Error();const data=await r.json();
-            await navigator.clipboard.writeText(data.key);status('Clé copiée.');
-          }catch{status('Copie indisponible.');}
-        },'btn client-button-primary');
-        actions.append(reveal,copy,link('.txt','/api/account/key.txt','btn ghost portal-action'));
-        keyRow.append(actions);viewport.append(keyRow);
-      }else{
-        const missing=block('div',undefined,'portal-missing-key');
-        missing.append(block('span','Clé non attribuée. Ouvre un ticket support pour la récupérer.'),
-          link('Ouvrir un ticket','https://discord.gg/uRQyKBhhgA','portal-small-link'));
-        viewport.append(missing);
+        keyRow.append(block('strong',display[purchase.planId]||'Pass'),block('span',purchase.expiresAt?'Expire le '+new Date(purchase.expiresAt).toLocaleString('fr-FR'):'Accès à vie','client-quiet'));
+        if(purchase.keyAvailable){
+          const query='?payment='+encodeURIComponent(purchase.paymentId);
+          const input=block('input');input.type='text';input.readOnly=true;input.value='•••• •••• ••••';input.className='portal-key-input';input.setAttribute('aria-label','Clé d’activation');
+          const getKey=async()=>{const r=await fetch('/api/account/key'+query,{cache:'no-store'});if(!r.ok)throw Error();return (await r.json()).key;};
+          keyRow.append(input);
+          const actions=block('div',undefined,'portal-key-actions');
+          actions.append(smallButton('Afficher',async()=>{try{input.value=await getKey();}catch{status('Clé indisponible.');}}),smallButton('Copier',async()=>{try{await navigator.clipboard.writeText(await getKey());status('Clé copiée.');}catch{status('Copie indisponible.');}},'btn client-button-primary'),link('.txt','/api/account/key.txt'+query,'btn ghost portal-action'));
+          keyRow.append(actions);
+        }else keyRow.append(block('p',purchase.waitingStock?'Paiement confirmé · Clé en attente de stock.':'Clé en cours de traitement ou achat historique.','client-quiet'));
+        viewport.append(keyRow);
       }
+      if(overview.legacyKeyAvailable){
+        const old=block('div',undefined,'portal-key-row');old.append(block('strong','Clé historique'));
+        old.append(smallButton('Afficher',async()=>{try{const r=await fetch('/api/account/key',{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();old.append(block('p',d.key));}catch{status('Clé indisponible.');}}),link('.txt','/api/account/key.txt','btn ghost portal-action'));viewport.append(old);
+      }
+      viewport.append(smallButton('Actualiser mes accès',()=>refresh(true)));
       viewport.append(smallButton('Synchroniser mon rôle',async()=>{
         status('Synchronisation des rôles…');
         try{
@@ -301,6 +291,7 @@ async function account(){
     }else if(tab==='admin'&&user.admin){
       const area=block('div',undefined,'portal-admin-tools');
       area.append(block('h3','Gestion Bro Client'));
+      if(user.stockPath)area.append(link('Gestion privée des clés',user.stockPath,'btn client-button-primary'));
       const actions=block('div',undefined,'portal-admin-actions');
       actions.append(smallButton('Site',editor),smallButton('Guides',()=>guides(true)));
       actions.append(smallButton('Installer /startkey',async()=>{
@@ -354,6 +345,8 @@ async function account(){
   }
   show('access');
   refresh();
+  // Whop can redirect before the signed webhook arrives. Poll briefly only on a return to the account.
+  if(location.hash==='#compte'){let tries=0;const timer=setInterval(()=>{if(!modal.open||++tries>12){clearInterval(timer);return;}refresh();},5000);}
 }
 async function loadInvoices(target,cursor) {
   const note=block('p','Chargement des paiements…');target.append(note);

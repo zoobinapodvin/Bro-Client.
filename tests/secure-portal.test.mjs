@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {listPaidPurchases,accountOverview,assignKey,readCustomerKey,encryptCustomerKey,
- decryptCustomerKey,validUploadedExe,storeRelease} from '../lib/fulfillment.mjs';
+ decryptCustomerKey,validUploadedExe,storeRelease,addStockKey,queuePaidKey,stockOverview,ownerStockPath} from '../lib/fulfillment.mjs';
 import {handleInteraction} from '../lib/discord.mjs';
 import {readFileSync} from 'node:fs';
 
@@ -15,15 +15,16 @@ const payment='pay_ABCDEF123456';
 const future=new Date(Date.now()+86400000).toISOString();
 const ledger=()=>({[prefix+payment]:{paymentId:payment,planId:'day',expiresAt:future}});
 const bucket=(data={})=>({
-  data,
+  data,versions:{},
   async list({prefix}){
     return {objects:Object.keys(this.data).filter(x=>x.startsWith(prefix)).map(key=>({key})),truncated:false,cursor:null};
   },
   async head(key){return this.data[key]?{pathname:key}:null;},
-  async get(key){return this.data[key]?{json:async()=>this.data[key]}:null;},
+  async get(key){return this.data[key]?{etag:String(this.versions[key]||0),json:async()=>structuredClone(this.data[key])}:null;},
   async put(key,value,options){
     if(options?.onlyIf?.etagDoesNotMatch==='*'&&this.data[key])return null;
-    this.data[key]=JSON.parse(value);return {etag:'saved'};
+    if(options?.onlyIf?.etagMatches!==undefined&&String(this.versions[key]||0)!==options.onlyIf.etagMatches)return null;
+    this.versions[key]=(this.versions[key]||0)+1;this.data[key]=JSON.parse(value);return {etag:String(this.versions[key])};
   }
 });
 test('no purchase exposes neither download nor license',async()=>{
@@ -47,7 +48,7 @@ test('license keys are encrypted, scoped to paid Discord identity and cannot be 
    const store=bucket(ledger());
    assert.deepEqual(await assignKey(store,{discordId:'1574096999999999999',key:'TEST-KEY-999',operatorId:owner}),{status:'no_purchase'});
    assert.deepEqual(await assignKey(store,{discordId:buyer,key:'TEST-KEY-999',operatorId:owner}),{status:'assigned'});
-   const encrypted=store.data['private/customer-keys/'+buyer+'.json'];
+   const encrypted=store.data['private/licenses/inventory-v1.json'];
    assert.equal(JSON.stringify(encrypted).includes('TEST-KEY-999'),false);
    assert.equal(await readCustomerKey(store,buyer),'TEST-KEY-999');
    assert.deepEqual(await assignKey(store,{discordId:buyer,key:'ANOTHER-KEY',operatorId:owner}),{status:'already_assigned'});
@@ -105,4 +106,26 @@ test('discontinued launcher cannot be offered or republished even with an existi
  const b=bucket({...ledger(),'private/releases/BroClient.exe':{old:true}});
  assert.equal((await accountOverview(b,{discordId:buyer})).downloadAvailable,false);
  assert.deepEqual(await storeRelease(b,Buffer.alloc(0)),{status:'distribution_discontinued'});
+});
+
+test('stock is encrypted, deduplicated and allocated at most once per verified payment',async t=>{
+ const old=process.env.BRO_KEY_ENCRYPTION_KEY;process.env.BRO_KEY_ENCRYPTION_KEY='b'.repeat(64);t.after(()=>{if(old===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=old;});
+ const admin='1027596385123565569', other='1574096900000000003',second='pay_SECOND123';
+ const store=bucket({...ledger(),['private/discord-entitlements/'+other+'/'+second]:{paymentId:second,planId:'day',expiresAt:future}});
+ assert.equal(ownerStockPath({discordId:other,admin:true}),null);assert.match(ownerStockPath({discordId:admin}),/^\/gestion-cles\/[a-f0-9]{64}$/);
+ assert.equal((await addStockKey(store,{planId:'day',key:'TEST-STOCK-001',operatorId:other})).status,'invalid');
+ assert.equal((await addStockKey(store,{planId:'day',key:'TEST-STOCK-001',operatorId:admin})).status,'added');
+ assert.equal((await addStockKey(store,{planId:'week',key:'TEST-STOCK-001',operatorId:admin})).status,'duplicate');
+ const orders=[{discordId:buyer,paymentId:payment,planId:'day',expiresAt:future},{discordId:other,paymentId:second,planId:'day',expiresAt:future}];
+ const results=await Promise.all(orders.map(order=>queuePaidKey(store,order)));
+ assert.deepEqual(results.map(x=>x.status).sort(),['assigned','waiting_stock']);
+ assert.equal((await stockOverview(store)).counts.day.available,0);
+ assert.equal((await stockOverview(store)).counts.day.assigned,1);
+ assert.equal((await addStockKey(store,{planId:'day',key:'TEST-STOCK-002',operatorId:admin})).assigned,true);
+ const keys=await Promise.all(orders.map(o=>readCustomerKey(store,o.discordId,o.paymentId)));assert.equal(new Set(keys).size,2);
+ assert.equal(await readCustomerKey(store,other,payment),null);
+ assert.equal((await queuePaidKey(store,orders[0])).status,'assigned');
+ assert.equal((await stockOverview(store)).counts.day.assigned,2);
+ assert.ok(!JSON.stringify(store.data).includes('TEST-STOCK-001'));
+ assert.equal((await queuePaidKey(store,{...orders[0],paymentId:'pay_FAKE123'})).status,'unverified');
 });

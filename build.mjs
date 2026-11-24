@@ -7,7 +7,7 @@ const checks=spawnSync(process.execPath,['--test','tests/bro-checkout-roles.test
 if(checks.status!==0)throw Error('Bro Client checks failed. Deployment stopped.');
 import {cp,mkdir} from 'node:fs/promises';
 await mkdir('dist',{recursive:true});
-for(const path of ['index.html','offres.html','app.js','style.css','assets','defaults.json','manifest.webmanifest','informations.html','informations.js','patchnotes.html','patchnotes.js']) await cp(path,'dist/'+path,{recursive:true});
+for(const path of ['index.html','offres.html','app.js','style.css','assets','defaults.json','manifest.webmanifest','informations.html','informations.js','patchnotes.html','patchnotes.js','key-stock.js','key-stock.css']) await cp(path,'dist/'+path,{recursive:true});
 
 const {readFile,writeFile}=await import('node:fs/promises');
 const home=await readFile('dist/index.html','utf8');

@@ -3,6 +3,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/gestion-cles/:path*",
+      "destination": "/api/platform?route=gestion-cles/:path*"
+    },
+    {
       "source": "/guides",
       "destination": "/guides.html"
     },
