@@ -173,21 +173,33 @@ test('homepage has a discreet, compact animated feed without repeated sales copy
 
 
 
-test('obsolete homepage preview is removed without hiding product and policy disclosures',()=>{
+test('obsolete homepage preview is removed and legal navigation remains available',()=>{
  const home=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
  const legal=readFileSync(new URL('../informations.html',import.meta.url),'utf8');
  assert.doesNotMatch(home,/id="apercus"|Explorer l’interface|full-launcher/);
  assert.doesNotMatch(js,/const gallery=\$/);
- assert.match(home,/assistance automatisée à la visée/);
- assert.match(home,/conformité de la version actuellement distribuée n’a pas été vérifiée/);
+ assert.match(home,/href="\/informations\.html"/);
  assert.match(legal,/Discord est obligatoire/);
 });
 
 
 test('recent feed uses the private index after initial backfill and keeps new receipts current',async()=>{const b=bucket();await storeActivity(b,normalizePayment(payment('pay_INDEX1','2026-11-22T12:00:00Z'),'day'));await recentPurchases(b);const original=b.list;b.list=async()=>{throw Error('full scan should not run');};await storeActivity(b,normalizePayment(payment('pay_INDEX2','2026-11-22T13:00:00Z'),'day'));assert.equal((await recentPurchases(b))[0].date,'2026-11-22T13:00:00.000Z');b.list=original;});
 test('no public invite links and account overview is preloaded without persistent private data',()=>{for(const p of ['index.html','offres.html','patchnotes.html','informations.html','app.js'])assert.doesNotMatch(readFileSync(new URL('../'+p,import.meta.url),'utf8'),/https:\/\/discord\.gg\//);const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');assert.match(js,/preloadedOverview/);assert.doesNotMatch(js,/sessionStorage\.setItem\([^\n]*overview/i);});
-test('announced new product scope is distinct from unverified existing licenses',()=>{const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');for(const label of ['Compteur de FPS','Clavier et souris','Widgets de bureau','Personnalisation d’interface','Options cosmétiques autorisées','Profils de configuration'])assert.ok(html.includes(label));assert.match(html,/fonctionnalités annoncées/);assert.match(html,/licences existantes/);assert.match(html,/conformité de la version actuellement distribuée n’a pas été vérifiée/);});
+test('announced product scope and legal navigation remain available',()=>{const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');for(const label of ['Compteur de FPS','Clavier et souris','Widgets de bureau','Personnalisation d’interface','Options cosmétiques autorisées','Profils de configuration'])assert.ok(html.includes(label));assert.match(html,/href="\/informations\.html"/);});
+
+
+// Check the substantive pre-purchase information without freezing its editorial wording.
+// These assertions are not a product compliance audit.
+test('product scope, historical risks and verification status remain visible before purchase',()=>{
+ const home=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const offers=readFileSync(new URL('../offres.html',import.meta.url),'utf8');
+ for(const html of [home,offers]){
+  const paragraphs=[...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(m=>m[1].replace(/<[^>]+>/g,' ').replace(/\s+/g,' '));
+  const notice=paragraphs.find(p=>/(?:visée|vis[eé]e assistée|aide à la visée|aimbot)/i.test(p)&&/(?:inaccessible|non accessible|non autoris|réservées)/i.test(p)&&/(?:sanction|bannissement|suspension)/i.test(p)&&/(?:licences|accès existants)/i.test(p)&&/(?:non vérifi|pas été vérifi|pas encore vérifi|reste à vérifi|non audit|pas été audit|pas confirm|reste à confirm|non confirm)/i.test(p));
+  assert.ok(notice,'Information produit et risques avant achat');
+ }
+});
 
 import {canEditHomepage,readHomepage,saveHomepage,validHomePatch,HOME_FIELDS} from '../lib/homepage.mjs';
 test('inline homepage publishes only owner changes with revision locking and no checkout or disclosure edits',async()=>{
@@ -204,10 +216,10 @@ test('inline homepage publishes only owner changes with revision locking and no 
 test('offers inline editor isolates each card and preserves protected checkout and disclosure fields',()=>{
  const html=readFileSync(new URL('../offres.html',import.meta.url),'utf8'),app=readFileSync(new URL('../app.js',import.meta.url),'utf8'),js=readFileSync(new URL('../homepage-editor.js',import.meta.url),'utf8'),css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
  for(const id of ['day','week','month','life']){assert.deepEqual(HOME_FIELDS['offer-plan-'+id],['title','text','cta','image']);assert.equal(validHomePatch('offer-plan-'+id,{price:'1'}),false);assert.equal(validHomePatch('offer-plan-'+id,{duration:'forever'}),false);assert.equal(validHomePatch('offer-plan-'+id,{checkoutUrl:'https://example.com'}),false);assert.equal(validHomePatch('offer-plan-'+id,{image:''}),true);}
- assert.match(html,/homepage-editor.js/);assert.match(app,/card.dataset.homeBlock='offer-plan-'\+plan.id/);assert.match(js,/--offer-custom-art/);assert.match(css,/data-offer-artwork=custom/);assert.doesNotMatch(html,/data-home-block="(?:capability-disclaimer|purchase-guide-warning)"/);assert.match(html,/conformité du logiciel actuellement distribué/);
+ assert.match(html,/homepage-editor.js/);assert.match(app,/card.dataset.homeBlock='offer-plan-'\+plan.id/);assert.match(js,/--offer-custom-art/);assert.match(css,/data-offer-artwork=custom/);assert.doesNotMatch(html,/data-home-block="(?:capability-disclaimer|purchase-guide-warning)"/);assert.match(html,/href="\/informations\.html"/);
 });
 
-test('compatibility block attributes installation and Windows compatibility claims to publisher testing',()=>{const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');assert.match(html,/id="broCompatibilityTitle"/);assert.match(html,/Windows 10 &amp; 11/);assert.match(html,/Windows 10 \(32 et 64 bits\) et Windows 11 \(64 bits\)/);assert.match(readFileSync(new URL('../offres.html',import.meta.url),'utf8'),/Windows 10 \(32 et 64 bits\) et Windows 11 \(64 bits\)/);assert.match(html,/Installation en un clic/);assert.match(html,/selon les tests de l’éditeur/);assert.match(html,/conformité de la version actuellement distribuée n’a pas été vérifiée/);});
+test('compatibility block attributes installation and Windows compatibility claims to publisher testing',()=>{const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');assert.match(html,/id="broCompatibilityTitle"/);assert.match(html,/Windows 10 &amp; 11/);assert.match(html,/Windows 10 \(32 et 64 bits\) et Windows 11 \(64 bits\)/);assert.match(readFileSync(new URL('../offres.html',import.meta.url),'utf8'),/Windows 10 \(32 et 64 bits\) et Windows 11 \(64 bits\)/);assert.match(html,/Installation en un clic/);assert.match(html,/selon les tests de l’éditeur/);});
 
 test('all homepage editorial cards including compatibility and setup have valid owner editing fields',()=>{const html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),js=readFileSync(new URL('../homepage-editor.js',import.meta.url),'utf8');for(const id of ['compat-heading','compat-1','compat-2','scope-heading'])assert.match(html,new RegExp('data-home-block="'+id+'"'));for(const id of ['compat-1','compat-2']){assert.equal(validHomePatch(id,{title:'Titre corrigé',text:'Texte corrigé',image:'/assets/test.webp'}),true);assert.equal(validHomePatch(id,{checkoutUrl:'https://example.com'}),false);}assert.equal(validHomePatch('scope-heading',{text:'Présentation'}),true);for(const [,id] of html.matchAll(/data-home-block="([^"]+)"/g))assert.ok(Object.hasOwn(HOME_FIELDS,id),id);assert.match(js,/offer-access\|compat\|offer-guide/);assert.doesNotMatch(html,/class="bro-compat-note"[^>]*data-home-block/);});
 
