@@ -129,3 +129,11 @@ test('stock is encrypted, deduplicated and allocated at most once per verified p
  assert.ok(!JSON.stringify(store.data).includes('TEST-STOCK-001'));
  assert.equal((await queuePaidKey(store,{...orders[0],paymentId:'pay_FAKE123'})).status,'unverified');
 });
+
+test('legacy keys are reserved against duplicate stock and not exposed to other buyers',async t=>{
+ const old=process.env.BRO_KEY_ENCRYPTION_KEY;process.env.BRO_KEY_ENCRYPTION_KEY='c'.repeat(64);t.after(()=>{if(old===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=old;});
+ const store=bucket({...ledger(),['private/customer-keys/'+buyer+'.json']:{...encryptCustomerKey('TEST-LEGACY-KEY'),assignedAt:new Date().toISOString()}});
+ assert.equal((await addStockKey(store,{planId:'week',key:'TEST-LEGACY-KEY',operatorId:'1027596385123565569'})).status,'duplicate');
+ assert.equal(await readCustomerKey(store,buyer,'legacy'),'TEST-LEGACY-KEY');
+ assert.equal(await readCustomerKey(store,'1574096900000000004','legacy'),null);
+});

@@ -136,6 +136,7 @@ async function account(){
   if(user.username)identity.append(block('small','Identifiant : '+user.username));
   profile.append(identity,block('span','Connecté','portal-connected'));
   body.append(profile);
+  if(user.stockPath&&!user.admin)body.append(link('Gestion privée des clés',user.stockPath,'btn client-button-primary'));
 
   const tabs=block('div',undefined,'portal-tabs');tabs.setAttribute('role','tablist');
   const viewport=block('section',undefined,'portal-view');viewport.setAttribute('aria-live','polite');
@@ -241,7 +242,7 @@ async function account(){
       }
       if(overview.legacyKeyAvailable){
         const old=block('div',undefined,'portal-key-row');old.append(block('strong','Clé historique'));
-        old.append(smallButton('Afficher',async()=>{try{const r=await fetch('/api/account/key',{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();old.append(block('p',d.key));}catch{status('Clé indisponible.');}}),link('.txt','/api/account/key.txt','btn ghost portal-action'));viewport.append(old);
+        old.append(smallButton('Afficher',async()=>{try{const r=await fetch('/api/account/key?payment=legacy',{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();old.append(block('p',d.key));}catch{status('Clé indisponible.');}}),link('.txt','/api/account/key.txt?payment=legacy','btn ghost portal-action'));viewport.append(old);
       }
       viewport.append(smallButton('Actualiser mes accès',()=>refresh(true)));
       viewport.append(smallButton('Synchroniser mon rôle',async()=>{

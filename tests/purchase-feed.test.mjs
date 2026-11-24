@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
 import {normalizePayment,backfillWhopHistory,recentPurchases,setActivityPreference} from '../lib/activity.mjs';
 import {handleBilling,createCheckout,attachVerifiedPayment,recoverAttributedPayment} from '../lib/billing.mjs';
+import {addStockKey,readCustomerKey,stockOverview} from '../lib/fulfillment.mjs';
 
 process.env.WHOP_ACCOUNT_ID='biz_emxZArodB6p2Af';
 const company='biz_emxZArodB6p2Af';
@@ -17,7 +18,7 @@ const bucket=()=>{
  const map=new Map();
  return {
   map,
-  get:async key=>map.has(key)?{json:async()=>JSON.parse(map.get(key))}:null,
+  get:async key=>map.has(key)?{etag:'test',json:async()=>JSON.parse(map.get(key))}:null,
   put:async (key,data)=>{map.set(key,String(data));return {etag:'test'};},
   head:async key=>map.has(key)?{etag:'test'}:null,
   list:async ({prefix})=>({objects:[...map.keys()].filter(key=>key.startsWith(prefix)).map(key=>({key})),truncated:false})
@@ -137,9 +138,10 @@ test('authenticated Discord checkout creates a Whop order reference without leak
  assert.equal(saved.checkoutId,'ch_TESTabc123');
 });
 
-test('verified webhook links attributed payment to Discord and publishes only opted-in avatar',async t=>{
+test('verified webhook links attributed payment, delivers one stocked license and publishes only opted-in avatar',async t=>{
  const original=globalThis.fetch;
- const oldWebhooks=Object.fromEntries(['BRO_DISCORD_WEBHOOK_DAY','BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY'].map(k=>[k,process.env[k]]));
+ const oldWebhooks=Object.fromEntries(['BRO_DISCORD_WEBHOOK_DAY','BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY','BRO_KEY_ENCRYPTION_KEY'].map(k=>[k,process.env[k]]));
+ process.env.BRO_KEY_ENCRYPTION_KEY='a'.repeat(64);
  delete process.env.BRO_DISCORD_WEBHOOK_DAY;delete process.env.BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY;
  t.after(()=>{
   globalThis.fetch=original;
@@ -148,14 +150,15 @@ test('verified webhook links attributed payment to Discord and publishes only op
  const b=bucket(),discordId='1574096900000000001';
  const user={discordId,discordUsername:'n7umber#0',discordAvatar:'https://cdn.discordapp.com/avatars/1574096900000000001/avatar.png'};
  await setActivityPreference(b,user,true);
+ assert.equal((await addStockKey(b,{planId:'day',key:'TEST-WEBHOOK-KEY',operatorId:'1027596385123565569'})).status,'added');
  const ref='39a1a1ec-f1d2-44a9-90ac-e8ed0f0f1234';
  b.map.set('private/orders/'+ref,JSON.stringify({
-  owner:'private-owner',discordId,variant:'plan_MCtWYReKKKb9m',planId:'day',
+  owner:'private-owner',discordId,variant:'plan_2XsZR1EchcSOj',planId:'day',fulfillmentVersion:2,
   checkoutId:'ch_TESTabc123',title:'Pass Jour',identity:{username:user.discordUsername,avatar:user.discordAvatar}
  }));
  globalThis.fetch=async(url)=>{
   assert.match(String(url),/\/payments\/pay_TESTabc123/);
-  return Response.json(payment({metadata:{bro_order:ref},variant_id:'plan_MCtWYReKKKb9m',
+  return Response.json(payment({metadata:{bro_order:ref},variant_id:'plan_2XsZR1EchcSOj',product:{id:'prod_Qs0u7iy24c6j3'},paid_at:new Date().toISOString(),
    checkout_configuration_id:'ch_TESTabc123',account_id:company}));
  };
  const event=JSON.stringify({type:'payment.succeeded',account_id:company,data:{id:'pay_TESTabc123'}});
@@ -174,6 +177,11 @@ test('verified webhook links attributed payment to Discord and publishes only op
  assert.equal(records[0].name,'n7umber');
  assert.equal(records[0].avatar,'https://cdn.discordapp.com/avatars/1574096900000000001/avatar.png');
  assert.ok(b.map.has('private/discord-entitlements/'+discordId+'/pay_TESTabc123'));
+ assert.equal(await readCustomerKey(b,discordId,'pay_TESTabc123'),'TEST-WEBHOOK-KEY');
+ assert.equal((await stockOverview(b)).counts.day.assigned,1);
+ const duplicate=new Request('https://www.broclient.com/api/whop/webhook',{method:'POST',body:event,headers:{'webhook-timestamp':stamp,'webhook-id':id,'webhook-signature':'v1,'+signature}});
+ assert.equal((await handleBilling(duplicate,{BUCKET:b,WHOP_API_KEY:'test-key',WHOP_ACCOUNT_ID:company,WHOP_WEBHOOK_SECRET:secret},null)).status,200);
+ assert.equal((await stockOverview(b)).counts.day.assigned,1);
 });
 
 test('invalid payment variant never links a Discord account despite a matching order reference',async t=>{

@@ -1,5 +1,5 @@
 import {spawnSync} from 'node:child_process';
-for(const script of ['app.js','api/platform.js','lib/fulfillment.mjs','lib/discord.mjs','lib/purchase-notify.mjs','lib/patchnotes.mjs','patchnotes.js','lib/activity.mjs','lib/checkout.mjs','lib/accounts.mjs']){
+for(const script of ['app.js','api/platform.js','lib/fulfillment.mjs','lib/discord.mjs','lib/purchase-notify.mjs','lib/patchnotes.mjs','patchnotes.js','lib/activity.mjs','lib/checkout.mjs','lib/accounts.mjs','key-stock.js']){
   const check=spawnSync(process.execPath,['--check',script],{stdio:'inherit'});
   if(check.status!==0)throw Error('JavaScript syntax check failed: '+script);
 }
