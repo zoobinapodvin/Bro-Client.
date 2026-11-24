@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {registerAccount,findAccount,listAccounts} from '../lib/accounts.mjs';
 const makeBucket=()=>{const map=new Map();let etag=0;return {
  map,async get(k){const item=map.get(k);return item?{etag:item.etag,json:async()=>JSON.parse(item.value)}:null;},
- async put(k,value,options={}){const old=map.get(k);if(options.onlyIf?.etagDoesNotMatch==='*'&&old)return null;if(options.onlyIf?.etagMatches&&old?.etag!==options.onlyIf.etag)return null;const entry={etag:String(++etag),value};map.set(k,entry);return entry;},
+ async put(k,value,options={}){const old=map.get(k);if(options.onlyIf?.etagDoesNotMatch==='*'&&old)return null;if(options.onlyIf?.etagMatches&&old?.etag!==options.onlyIf.etagMatches)return null;const entry={etag:String(++etag),value};map.set(k,entry);return entry;},
  async list({prefix,limit=25}){return {objects:[...map.keys()].filter(k=>k.startsWith(prefix)).slice(0,limit).map(key=>({key})),truncated:false};}
 };};
 const user={id:'auth-a',discordId:'1574096900000000001',discordUsername:'Same name',discordAvatar:null};
