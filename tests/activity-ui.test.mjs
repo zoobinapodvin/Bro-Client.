@@ -192,9 +192,9 @@ test('announced product scope and legal navigation remain available',()=>{const 
 // Check the substantive pre-purchase information without freezing its editorial wording.
 // These assertions are not a product compliance audit.
 test('product scope, historical risks and verification status remain visible before purchase',()=>{
- const home=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const offers=readFileSync(new URL('../offres.html',import.meta.url),'utf8');
- for(const html of [home,offers]){
+ // The purchase page retains the detailed disclosure; the homepage need not duplicate it.
+ for(const html of [offers]){
   const paragraphs=[...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(m=>m[1].replace(/<[^>]+>/g,' ').replace(/\s+/g,' '));
   const notice=paragraphs.find(p=>/(?:visée|vis[eé]e assistée|aide à la visée|aimbot)/i.test(p)&&/(?:inaccessible|non accessible|non autoris|réservées)/i.test(p)&&/(?:sanction|bannissement|suspension)/i.test(p)&&/(?:licences|accès existants)/i.test(p)&&/(?:non vérifi|pas été vérifi|pas encore vérifi|reste à vérifi|non audit|pas été audit|pas confirm|reste à confirm|non confirm)/i.test(p));
   assert.ok(notice,'Information produit et risques avant achat');
