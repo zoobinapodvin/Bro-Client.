@@ -184,3 +184,26 @@ test('only verified buyers can read the new customer documentation, including fo
  assert.ok(config.rewrites.filter(x=>x.source.startsWith('/guides')).every(x=>x.destination.startsWith('/api/platform?route=')));
  for(const p of ['index.html','offres.html','patchnotes.html'])assert.match(readFileSync(new URL('../'+p,import.meta.url),'utf8'),/data-paid-guides hidden/);
 });
+
+test('paused automatic license allocation preserves stock, verified pending orders and existing keys',async t=>{
+ const saved=process.env.BRO_KEY_DELIVERY_PAUSED, enc=process.env.BRO_KEY_ENCRYPTION_KEY;
+ t.after(()=>{if(saved===undefined)delete process.env.BRO_KEY_DELIVERY_PAUSED;else process.env.BRO_KEY_DELIVERY_PAUSED=saved;if(enc===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=enc;});
+ process.env.BRO_KEY_ENCRYPTION_KEY='d'.repeat(64);
+ const admin='1027596385123565569',other='1574096900000000003',second='pay_SECOND123';
+ const store=bucket({...ledger(),['private/discord-entitlements/'+other+'/'+second]:{paymentId:second,planId:'day',expiresAt:future}});
+ process.env.BRO_KEY_DELIVERY_PAUSED='false';
+ await addStockKey(store,{planId:'day',key:'TEST-EXISTING-001',operatorId:admin});
+ assert.equal((await queuePaidKey(store,{discordId:buyer,paymentId:payment,planId:'day',expiresAt:future})).status,'assigned');
+ process.env.BRO_KEY_DELIVERY_PAUSED='true';
+ await addStockKey(store,{planId:'day',key:'TEST-PAUSED-002',operatorId:admin});
+ const order={discordId:other,paymentId:second,planId:'day',expiresAt:future};
+ assert.equal((await queuePaidKey(store,order)).status,'waiting_stock');
+ assert.equal((await addStockKey(store,{planId:'day',key:'TEST-PAUSED-003',operatorId:admin})).assigned,false);
+ assert.equal((await stockOverview(store)).counts.day.available,2);
+ assert.equal((await stockOverview(store)).counts.day.waiting,1);
+ assert.equal(await readCustomerKey(store,buyer,payment),'TEST-EXISTING-001');
+ assert.equal(await readCustomerKey(store,other,second),null);
+ process.env.BRO_KEY_DELIVERY_PAUSED='false';
+ assert.equal((await queuePaidKey(store,order)).status,'assigned');
+ assert.ok(await readCustomerKey(store,other,second));
+});
