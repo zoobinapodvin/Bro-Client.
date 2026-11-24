@@ -24,6 +24,10 @@ await cp('guides.css','dist/guides.css');
    const detail=JSON.stringify({message:j.message,title:j.title,detail:j.detail,errors:j.errors}).toLowerCase();
    const kinds=['token','webstore','account','package','quantity','username','auth','ip_address','complete_url','cancel_url','custom','not found','not enabled','not available','required','invalid'];
    console.log('Tebex diagnostic',stage,r.status,kinds.filter(k=>detail.includes(k)).join(','));
+   if(!r.ok){
+     const message=String(j.detail||j.message||j.title||'').replace(/[^a-zA-Z0-9 .,:'_-]/g,' ').replace(/[a-zA-Z0-9_-]{16,}/g,'[redacted]').slice(0,180);
+     console.log('Tebex validation message',stage,message);
+   }
    return r.ok?(j.data??j):null;
   };
   try{
@@ -31,11 +35,12 @@ await cp('guides.css','dist/guides.css');
    if(store){
     for(const id of ['7832046','7832045','7832044','7832042']){
      const p=await probe('package '+id,'/accounts/'+encodeURIComponent(token)+'/packages/'+id);
-     if(p)console.log('Tebex catalog match',id,String(p.id)===id);
+     if(p){ console.log('Tebex catalog match',id,String(p.id)===id,'ident present',typeof p.ident==='string','type',String(p.type??'unknown').replace(/[^a-z0-9_-]/gi,'').slice(0,30)); if(id==='7832046')globalThis.broProbePackage=p; }
     }
     const basket=await probe('create','/accounts/'+encodeURIComponent(token)+'/baskets',{complete_url:'https://www.broclient.com/',cancel_url:'https://www.broclient.com/offres',complete_auto_redirect:true,custom:{bro_order:randomUUID()}});
     if(basket?.ident){
-     const result=await probe('add','/baskets/'+encodeURIComponent(basket.ident)+'/packages',{package_id:'7832046',quantity:1});
+     const p=globalThis.broProbePackage;
+     const result=await probe('add-ident','/baskets/'+encodeURIComponent(basket.ident)+'/packages',{package_id:String(p?.ident||p?.id||'7832046'),quantity:1});
      if(result)console.log('Tebex checkout link returned',Boolean(result.links?.checkout));
     }
    }
