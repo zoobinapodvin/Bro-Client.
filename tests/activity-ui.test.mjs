@@ -243,3 +243,19 @@ test('recent purchase names use customer and lifetime color styles',()=>{
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
  for(const cls of ['purchase-name-customer','purchase-name-lifetime']){assert.ok(js.includes(cls));assert.ok(css.includes(cls));}
 });
+
+test('checkout assistance is hidden until session verification and visible only to disconnected visitors',async()=>{
+ const html=readFileSync(new URL('../offres.html',import.meta.url),'utf8');
+ assert.match(html,/<div class="checkout-note" hidden data-guest-checkout-note/);
+ const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const sync=js.split('\n').find(line=>line.startsWith('function syncGuideNavigation()'));
+ assert.ok(sync);
+ const {runInNewContext}=await import('node:vm');
+ const note={hidden:true};
+ const context={accountReady:false,user:null,document:{querySelectorAll:s=>s==='[data-guest-checkout-note]'?[note]:[]},window:{dispatchEvent(){}},Event:class{}};
+ runInNewContext(sync,context);
+ context.syncGuideNavigation();assert.equal(note.hidden,true);
+ context.accountReady=true;context.syncGuideNavigation();assert.equal(note.hidden,false);
+ context.user={discordLinked:true};context.syncGuideNavigation();assert.equal(note.hidden,true);
+ context.user=null;context.syncGuideNavigation();assert.equal(note.hidden,false);
+});
