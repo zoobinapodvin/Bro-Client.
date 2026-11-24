@@ -248,7 +248,11 @@ async function account(){
       pass.append(block('span','PASS ACTIF','client-kicker'),block('strong',display[last?.planId]||'Bro Client'),
         block('span',last?.planId==='life'?'Accès à vie':'Actif','client-tag-active'));
       viewport.append(pass);
-      viewport.append(block('p','La distribution du launcher a été arrêtée. Pour toute question concernant un achat antérieur, contacte le support.','client-quiet'));
+      const launcherNotice=block('p','Pour télécharger le launcher, c’est ','client-quiet');
+      const launcherLink=link('ici','https://discord.com/channels/1448897452404117558/1574774596706508821');
+      launcherLink.style.textDecoration='underline';
+      launcherLink.target='_blank';launcherLink.rel='noopener noreferrer';
+      launcherNotice.append(launcherLink,'.');viewport.append(launcherNotice);
       for(const purchase of active){
         const keyRow=block('div',undefined,'portal-key-row');
         keyRow.append(block('strong',display[purchase.planId]||'Pass'),block('span',purchase.expiresAt?'Accès Discord jusqu’au '+new Date(purchase.expiresAt).toLocaleString('fr-FR'):'Accès Discord à vie','client-quiet'));
