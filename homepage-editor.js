@@ -4,7 +4,7 @@ const $=s=>document.querySelector(s),all=s=>Array.from(document.querySelectorAll
 let current=null,checking=false,publishing=false,pendingReload=false;
 const editorDialog=node('dialog',undefined,'home-edit-dialog');
 editorDialog.setAttribute('aria-label','Édition du contenu');document.body.append(editorDialog);
-const endpoint='/api/homepage',imageIds=/^(hero-image|(?:access|scope|club|faq|offer-access|compat)-\d+|offer-plan-(?:day|week|month|life))$/;
+const endpoint='/api/homepage',imageIds=/^(hero-image|(?:access|scope|club|faq|offer-access|compat|offer-guide)-\d+|offer-plan-(?:day|week|month|life))$/;
 const fieldNames={eyebrow:'Surtitre',title:'Titre',title1:'Titre · ligne 1',title2:'Titre · ligne 2',text:'Texte',primary:'Bouton principal',secondary:'Bouton secondaire',cta:'Bouton',image:'Image',item1:'Point clé 1',item2:'Point clé 2'};
 const isOwner=()=>typeof user!=='undefined'&&user?.homeEditor===true;
 const fieldNodes=el=>Array.from(el.querySelectorAll('[data-home-field]')).filter(n=>n.closest('[data-home-block]')===el);

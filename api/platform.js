@@ -112,7 +112,9 @@ export default async function handler(req,res) {
     if((path==='/api/homepage'||path==='/api/homepage/media')&&req.method==='POST'){
       if(!canEditHomepage(user))return res.status(403).json({error:'Accès propriétaire requis.'});
       if(path.endsWith('/media'))return await respond(res,await upload(new Request(new URL(path,origin),{method:'POST',headers:req.headers,body:payload}),bucket));
-      return await respond(res,await saveHomepage(bucket,user,req.headers['if-match'],JSON.parse(payload.toString())));
+      if(!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type']||''))return res.status(415).json({error:'Format JSON requis.'});
+      let patch;try{patch=JSON.parse(payload.toString());}catch{return res.status(400).json({error:'Contenu illisible.'});}
+      return await respond(res,await saveHomepage(bucket,user,req.headers['if-match'],patch));
     }
     if(/^\/guides(?:\.html|\/[a-z-]+(?:\.html)?)?$/.test(path)&&req.method==='GET'){
       res.setHeader('Content-Type','text/html; charset=utf-8');
@@ -285,7 +287,7 @@ export default async function handler(req,res) {
     const request=new Request(url,{method:req.method,headers:req.headers,body:payload});
     const invoice=await handleBilling(request,billingEnv,user?.id??null);if(invoice)return await respond(res,invoice);
     if((path==='/api/site'||path==='/api/media')&&req.method==='POST'){
-      if(!user?.admin)return res.status(403).json({error:'Accès administrateur requis.'});
+      if(!canEditHomepage(user))return res.status(403).json({error:'Accès administrateur requis.'});
       if(path==='/api/site'&&!req.headers['if-match'])return res.status(428).json({error:'Recharge la page avant de modifier le site.'});
       return await respond(res,path==='/api/site'?await saveSite(request,bucket):await upload(request,bucket));
     }

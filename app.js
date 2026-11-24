@@ -317,7 +317,8 @@ async function account(){
       area.append(block('h3','Gestion Bro Client'));
       if(user.stockPath)area.append(link('Gestion privée des clés',user.stockPath,'btn client-button-primary'));
       const actions=block('div',undefined,'portal-admin-actions');
-      actions.append(smallButton('Site',editor),smallButton('Guides',()=>guides(true)));
+      if(user.homeEditor)actions.append(smallButton('Site',editor));
+      actions.append(smallButton('Guides',()=>guides(true)));
       actions.append(smallButton('Installer /startkey',async()=>{
         try{const response=await fetch('/api/discord/register',{method:'POST'});
           const data=await response.json();status(data.status==='registered'?'Commandes installées.':'Bot non configuré.');}
@@ -436,7 +437,7 @@ async function guides(edit){
   }catch{status.textContent='Les guides sont momentanément indisponibles.';}
 }
 function editor(){
-  if(!user?.admin)return;
+  if(!user?.homeEditor)return;
   openDialog('Administration');modal.classList.add('editing');
   const draft=structuredClone({content:site.content,plans:site.plans});const revision=site.revision;
   const form=block('form',undefined,'editor');const status=block('p','','notice');status.setAttribute('role','status');
@@ -619,9 +620,11 @@ if(document.querySelector('[data-patchnote-banner]')){
    .then(({notes})=>{
     const latest=Array.isArray(notes)?notes.find(n=>n.status==='published'):null;
     if(!latest)return;
+    const version=document.querySelector('[data-patchnote-version]');
     const title=document.querySelector('[data-patchnote-head]');
     const subtitle=document.querySelector('[data-patchnote-detail]');
-    if(title)title.textContent='Dernière mise à jour · '+latest.version;
+    if(version)version.textContent=' · '+latest.version;
+    else if(title)title.textContent='Dernière mise à jour · '+latest.version;
     if(subtitle)subtitle.textContent=latest.title;
     // The badge always opens the complete archive, not a single update.
     const banner=document.querySelector('[data-patchnote-banner]');
