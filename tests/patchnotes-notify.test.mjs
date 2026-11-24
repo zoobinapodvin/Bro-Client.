@@ -146,3 +146,28 @@ test('purchase notification includes a protected license reference and verified 
  assert.ok(!JSON.stringify(messages).includes('TEST-NEVER-SEND'));
  assert.equal((await notifyVerifiedPurchase(b,order,p)).alreadySent,true);assert.equal(messages.length,2);
 });
+
+test('patchnote retries a catalogue conflict but never overwrites a newer edit of the same note',async()=>{
+ const b=makeBucket();
+ const created=(await editPatchnote(b,note)).item;
+ const originalPut=b.put;
+ let first=true;
+ b.put=async(...args)=>{if(first){first=false;return null;}return originalPut(...args);};
+ const updated=await editPatchnote(b,{...note,action:'update',id:created.id,expectedUpdatedAt:created.updatedAt,title:'Mise à jour confirmée'});
+ assert.equal(updated.status,200);
+ assert.equal((await readPatchnote(b,created.id)).title,'Mise à jour confirmée');
+ const stale=await editPatchnote(b,{action:'delete',id:created.id,expectedUpdatedAt:'2000-01-01T00:00:00.000Z'});
+ assert.equal(stale.status,409);
+ assert.ok(await readPatchnote(b,created.id));
+ first=true;
+ const deleted=await editPatchnote(b,{action:'delete',id:created.id,expectedUpdatedAt:updated.item.updatedAt});
+ assert.equal(deleted.deleted,true);
+ assert.equal(await readPatchnote(b,created.id),null);
+});
+test('patchnote editor waits for a confirmed mutation and retains the note revision',()=>{
+ const src=readFileSync(new URL('../patchnotes.js',import.meta.url),'utf8');
+ assert.ok(src.includes('expectedUpdatedAt:editingUpdatedAt'));
+ assert.ok(src.includes('result.deleted!==true'));
+ assert.ok(src.includes('loadDetail(result.item)'));
+ assert.ok(src.includes('history.replaceState'));
+});
