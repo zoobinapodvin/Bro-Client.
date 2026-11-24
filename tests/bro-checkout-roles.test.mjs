@@ -72,13 +72,14 @@ test('Discord community counts use the actual Bro Client guild only',()=>{
  assert.equal(normalizeCounts({guild:{id:'123456789012345678'},approximate_member_count:5000,approximate_presence_count:500}),null);
  assert.equal(normalizeCounts({guild:{id:'1448897452404117558'},approximate_member_count:'210',approximate_presence_count:47}),null);
 });
-test('both public navigation headers include the linked Discord counter',()=>{
+test('both public navigation headers include a non-clickable Discord counter',()=>{
  for(const page of ['index.html','offres.html']){
   const html=readFileSync(new URL('../'+page,import.meta.url),'utf8');
   assert.ok(html.includes('data-discord-community'));
   assert.ok(html.includes('data-discord-online'));
   assert.ok(html.includes('data-discord-total'));
-  assert.ok(html.includes('https://discord.gg/uRQyKBhhgA'));
+  assert.doesNotMatch(html,/https:\/\/discord\.gg\//);
+  assert.match(html,/<div class="discord-live" data-discord-community/);
   assert.ok(html.indexOf('data-discord-community')<html.indexOf('<nav aria-label="Navigation principale">'));
  }
 });

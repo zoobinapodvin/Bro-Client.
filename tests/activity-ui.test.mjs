@@ -183,3 +183,7 @@ test('obsolete homepage preview is removed without hiding product and policy dis
  assert.match(home,/conformité de la version actuellement distribuée n’a pas été vérifiée/);
  assert.match(legal,/Discord est obligatoire/);
 });
+
+
+test('recent feed uses the private index after initial backfill and keeps new receipts current',async()=>{const b=bucket();await storeActivity(b,normalizePayment(payment('pay_INDEX1','2026-11-22T12:00:00Z'),'day'));await recentPurchases(b);const original=b.list;b.list=async()=>{throw Error('full scan should not run');};await storeActivity(b,normalizePayment(payment('pay_INDEX2','2026-11-22T13:00:00Z'),'day'));assert.equal((await recentPurchases(b))[0].date,'2026-11-22T13:00:00.000Z');b.list=original;});
+test('no public invite links and account overview is preloaded without persistent private data',()=>{for(const p of ['index.html','offres.html','patchnotes.html','informations.html','app.js'])assert.doesNotMatch(readFileSync(new URL('../'+p,import.meta.url),'utf8'),/https:\/\/discord\.gg\//);const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');assert.match(js,/preloadedOverview/);assert.doesNotMatch(js,/sessionStorage\.setItem\([^\n]*overview/i);});

@@ -7,7 +7,7 @@ import {registerAccount,listAccounts,findAccount,readAccount} from '../lib/accou
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
 import {accountOverview,readCustomerKey,ownerStockPath,stockOverview,addStockKey,revealStockKey,importStockKeys} from '../lib/fulfillment.mjs';
-import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary} from '../lib/activity.mjs';
+import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary,rebuildRecentIndex} from '../lib/activity.mjs';
 import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
 import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
 import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides,CUSTOMER_GUIDES_KEY} from '../lib/customer-guides.mjs';
@@ -57,33 +57,9 @@ export default async function handler(req,res) {
       return res.json(counts);
     }
     if(path==='/api/activity'&&req.method==='GET'){
-      // Receipts only: no anonymous payments are ever bound to Discord accounts.
-      // A durable throttle also prevents API errors from triggering repeated
-      // expensive upstream requests on every visitor's 15-second poll.
-      const marker='private/activity/whop-feed-refresh-v2.json';
-      const previous=await bucket.get(marker);
-      let last=previous?await previous.json().catch(()=>null):null;
-      const configured=Boolean(billingEnv.WHOP_API_KEY&&billingEnv.WHOP_ACCOUNT_ID);
-      let sync=configured?(last?.status??'pending'):'not_configured';
-      if(configured&&(!last?.at||Date.now()-Date.parse(last.at)>90000)){
-        const at=new Date().toISOString();
-        try{
-          const report=await backfillWhopHistory(bucket,{
-            apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,maxPages:2
-          });
-          sync=report.status==='ok'?'ok':'pending';
-          last={at,status:sync,checked:report.reviewed??0,imported:report.imported??0};
-        }catch(error){
-          console.error('Whop activity refresh failed',error?.message);
-          sync='error';last={at,status:sync};
-        }
-        try{await bucket.put(marker,JSON.stringify(last));}catch(error){
-          console.error('Whop activity refresh marker failed',error?.name);
-        }
-      }
-      res.setHeader('Cache-Control','no-store');
-      return res.json({purchases:await recentPurchases(bucket),
-        sync:{state:sync,checkedAt:last?.at??null}});
+      // Never contact Whop during a visitor's request; the signed webhook and cron maintain receipts.
+      res.setHeader('Cache-Control','private, no-store');
+      return res.json({purchases:await recentPurchases(bucket),sync:{state:'ok'}});
     }
     if(path==='/api/site'&&req.method==='GET'){
       const {site:config,revision}=await site();return res.json({...config,revision});
@@ -110,6 +86,7 @@ export default async function handler(req,res) {
       if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();
       const roles=await reconcileExpiredRoles(bucket);
       let notifications=null;
+      try{await backfillWhopHistory(bucket,{apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,maxPages:2});await rebuildRecentIndex(bucket);}catch(error){console.error('Activity background refresh failed',error?.name);}
       try{
         notifications=await reconcilePaymentNotifications(bucket,{
           apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,
@@ -189,9 +166,9 @@ export default async function handler(req,res) {
       return res.status(result.status).json(result);
     }
     if(path==='/api/me'&&req.method==='GET'){
-      const account=user?await rememberAccount(user):null;
-      let guideAccess=false;if(user)try{guideAccess=await canReadCustomerGuides(bucket,user);}catch(error){console.error('Guide entitlement unavailable',error?.name);}
-      return res.json({user:user?{
+      const [account,overview]=user?await Promise.all([rememberAccount(user),accountOverview(bucket,user).catch(error=>{console.error('Overview preload unavailable',error?.name);return null;})]):[null,null];
+      const guideAccess=overview?.hasPurchase===true;
+      return res.json({overview,user:user?{
       username:account?.username??null,
       discordUsername:user.discordUsername,
       discordAvatar:user.discordAvatar,

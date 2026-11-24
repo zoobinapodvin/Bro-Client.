@@ -11,6 +11,14 @@ const paths = {
   menu:'<path d="M3 6h18M3 12h18M3 18h18"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>'
 };
 let site, user = null, accountReady = false;
+let sessionRequest=null,overviewRequest=null,preloadedOverview=null,overviewAt=0,sessionEpoch=0;
+const freshOverview=()=>preloadedOverview&&Date.now()-overviewAt<30000?preloadedOverview:null;
+async function requestOverview(){
+ if(overviewRequest)return overviewRequest;
+ const epoch=sessionEpoch;
+ const pending=(async()=>{const r=await fetch('/api/account/overview',{cache:'no-store'});if(!r.ok)throw Error('overview');const value=await r.json();if(epoch!==sessionEpoch||!user)throw Error('session_changed');preloadedOverview=value;overviewAt=Date.now();return value;})();
+ overviewRequest=pending;try{return await pending;}finally{if(overviewRequest===pending)overviewRequest=null;}
+}
 function syncGuideNavigation(){document.querySelectorAll('[data-paid-guides]').forEach(el=>{el.hidden=user?.guideAccess!==true;});}
 const block = (tag, text, cls) => {
   const el = document.createElement(tag);
@@ -31,6 +39,8 @@ function asset(value) {
 }
 function render(){
   const c={...site.content};
+  if(c.feature2Title==='Le Discord')c.feature2Title='Assistance client';
+  if(c.feature2Text==='Échange avec la communauté et contacte l’équipe Bro Client.')c.feature2Text='Retrouve les informations de contact du vendeur et l’assistance liée à tes commandes.';
   // Migrate only old marketing copy: preserve newer text customized by admins.
   if(['Choisis ton pass, retrouve tes guides et rejoins la communauté BRO.','Aimbot, ESP avancé, outils d’inventaire et profils personnalisés pour ROB RUN. Découvre BRO CLIENT sur PC Windows.'].includes(c.intro))
     c.intro="Découvre BRO CLIENT, ses accès, ses réglages et sa communauté. Retrouve tes guides et ton espace client au même endroit.";
@@ -103,6 +113,10 @@ async function account(){
   body.classList.add('client-portal-body');
   const notice=block('p','','client-status-message');
   notice.setAttribute('role','status');
+  if(!accountReady&&sessionRequest){
+    body.append(block('p','Vérification de ta session…','client-quiet'));
+    await sessionRequest;if(modal.open&&body.querySelector('#dialogTitle')?.textContent==='Mon espace BRO.')return account();return;
+  }
   if(!accountReady){
     body.append(block('p','Impossible de récupérer ta session.','client-quiet'),
       button('Réessayer',async()=>{await loadUser();account();},'btn client-button-primary'));
@@ -142,7 +156,7 @@ async function account(){
   const tabs=block('div',undefined,'portal-tabs');tabs.setAttribute('role','tablist');
   const viewport=block('section',undefined,'portal-view');viewport.setAttribute('aria-live','polite');
   const tabButtons=new Map();
-  let purchases=[],overview=null,current='access';
+  let overview=freshOverview(),purchases=overview?.purchases||[],current='access',refreshing=false,overviewSignature=overview?JSON.stringify(overview):'';
   for(const [id,label] of [['access','Mes accès'],['orders','Mes achats'],['help','Aide'],...(user.admin?[['admin','Administration']]:[])]){
     const item=button(label,()=>show(id),'portal-tab');
     item.setAttribute('role','tab');item.setAttribute('aria-selected','false');
@@ -157,7 +171,7 @@ async function account(){
     try{
       const res=await fetch('/auth/unlink',{method:'POST'});
       if(!res.ok)throw Error();
-      user=null;syncGuideNavigation();account();
+      sessionEpoch++;user=null;preloadedOverview=null;overviewAt=0;overviewRequest=null;syncGuideNavigation();account();
     }catch{notice.textContent='Déconnexion indisponible. Réessaie.';logout.disabled=false;}
   },'portal-logout');
   const discordLogo=block('span',undefined,'discord-brand-icon');discordLogo.innerHTML=discordMark;
@@ -165,18 +179,21 @@ async function account(){
 
   const status=(text)=>{notice.textContent=text||'';};
   async function refresh(manual=false){
+    if(refreshing)return;refreshing=true;
     try{
       if(manual)status('Actualisation des achats…');
-      const result=await fetch('/api/account/overview',{cache:'no-store'});
-      if(!result.ok)throw Error();
-      overview=await result.json();
+      const next=await requestOverview();
+      if(!viewport.isConnected||!modal.open)return;
+      const signature=JSON.stringify(next),changed=signature!==overviewSignature;
+      overview=next;overviewSignature=signature;
       purchases=overview.purchases||[];
       if(user){user.guideAccess=overview.hasPurchase===true;syncGuideNavigation();}
-      show(current);
+      if(changed&&(current==='access'||current==='orders'))show(current);
       if(manual)status('Achats actualisés.');
     }catch{
-      if(manual)status('Impossible de récupérer les achats actuellement.');
-    }
+      if(manual||!overview)status('Impossible de récupérer les achats actuellement.');
+      if(!overview&&current==='access'&&viewport.isConnected){viewport.replaceChildren(block('p','Les accès sont temporairement indisponibles.','client-quiet'),smallButton('Réessayer',()=>refresh(true)));}
+    }finally{refreshing=false;}
   }
   function smallButton(label,callback,cls='btn ghost'){
     return button(label,callback,cls+' portal-action');
@@ -212,7 +229,8 @@ async function account(){
     current=tab;viewport.replaceChildren();
     for(const [id,el] of tabButtons){el.classList.toggle('active',id===tab);el.setAttribute('aria-selected',String(id===tab));}
     if(tab==='access'){
-      if(!overview?.active){
+      if(!overview){viewport.append(block('div','Vérification des accès…','portal-loading'));return;}
+      if(!overview.active){
         const empty=block('div',undefined,'portal-empty');
         const text=block('div',undefined,'portal-empty-text');
         text.append(block('span','MES ACCÈS','client-kicker'),block('h3','Aucun pass actif'),block('p','Tes accès seront disponibles après ton premier achat.'));
@@ -287,7 +305,7 @@ async function account(){
       viewport.append(block('h3','Besoin d’aide ?'),block('p','Assistance pour ton compte et tes achats.','client-quiet'));
       const links=block('div',undefined,'portal-help-actions');
       if(user.guideAccess===true)links.append(link('Consulter les guides','/guides','btn client-button-primary'));
-      const guild=discordButton('Discord et tickets','https://discord.gg/uRQyKBhhgA','btn client-discord-link portal-action');
+      const guild=link('Contacter le vendeur','/informations.html#assistance','btn client-discord-link portal-action');
       guild.target='_blank';guild.rel='noopener noreferrer';links.append(guild);
       viewport.append(links);
       viewport.append(profileVisibilitySetting());
@@ -347,9 +365,9 @@ async function account(){
     }
   }
   show('access');
-  refresh();
+  if(!overview)refresh();
   // Whop can redirect before the signed webhook arrives. Poll briefly only on a return to the account.
-  if(location.hash==='#compte'){let tries=0;const timer=setInterval(()=>{if(!modal.open||++tries>12){clearInterval(timer);return;}refresh();},5000);}
+  if(location.hash==='#compte'){let tries=0;const timer=setInterval(()=>{if(!modal.open||!viewport.isConnected||++tries>12){clearInterval(timer);return;}refresh();},5000);}
 }
 async function loadInvoices(target,cursor) {
   const note=block('p','Chargement des paiements…');target.append(note);
@@ -370,7 +388,7 @@ async function loadInvoices(target,cursor) {
           try{await navigator.clipboard.writeText(invoice.id);copy.textContent='Référence copiée';}
           catch{ref.textContent='Référence à copier : '+invoice.id;}
         });
-        const support=link('Contacter le support Discord','https://discord.gg/uRQyKBhhgA','portal-small-link');
+        const support=link('Contacter le vendeur','/informations.html#assistance','portal-small-link');
         support.target='_blank';support.rel='noopener noreferrer';
         row.append(ref,copy,support);
       }
@@ -457,7 +475,12 @@ function editor(){
     }catch{status.textContent='Enregistrement impossible. Vérifie les champs et les liens Whop.';}finally{save.disabled=false;}
   };
 }
-async function loadUser(){try{const response=await fetch('/api/me',{cache:'no-store'});if(!response.ok)throw Error();user=(await response.json()).user;accountReady=true;}catch{accountReady=false;user=null;}finally{syncGuideNavigation();}}
+async function loadUser(){
+ if(sessionRequest)return sessionRequest;
+ const epoch=sessionEpoch;
+ const pending=(async()=>{try{const response=await fetch('/api/me',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json();if(epoch!==sessionEpoch)return;user=data.user;accountReady=true;preloadedOverview=user?data.overview??null:null;overviewAt=Date.now();if(user&&!preloadedOverview)requestOverview().catch(()=>{});}catch{if(epoch===sessionEpoch){accountReady=false;user=null;preloadedOverview=null;}}finally{syncGuideNavigation();}})();
+ sessionRequest=pending;try{return await pending;}finally{if(sessionRequest===pending)sessionRequest=null;}
+}
 document.querySelectorAll('i[data-icon]').forEach(el=>{el.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+paths[el.dataset.icon]+'</svg>';});
 $('.close').onclick=()=>modal.close();modal.addEventListener('click',e=>{if(e.target===modal){const r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)modal.close();}});
 document.querySelectorAll('[data-account]').forEach(el=>el.onclick=account);
@@ -472,30 +495,31 @@ if(location.hash==='#tarifs')location.replace('/offres');
   const session=loadUser();
   try{const res=await fetch('/api/site',{cache:'no-store'});if(!res.ok)throw Error();site=await res.json();if(!site.content||!site.plans)throw Error();}
   catch{site=await(await fetch('/defaults.json')).json();}
-  render();await session;if(location.hash==='#compte')account();
+  render();await session;if(location.hash==='#compte'&&!modal.open)account();
 })();
 
 
 /* Community stats are approximate and fetched from a public same-origin API, never from client-side bot secrets. */
 const discordCounter=document.querySelector('[data-discord-community]');
+let counterBusy=false;
+function paintCounter(result){
+ if(!result?.available||!Number.isSafeInteger(result.members)||result.members<0||!Number.isSafeInteger(result.online)||result.online<0||result.online>result.members)return false;
+ discordCounter.querySelector('[data-discord-online]').textContent=result.online.toLocaleString('fr-FR');discordCounter.querySelector('[data-discord-total]').textContent=result.members.toLocaleString('fr-FR');discordCounter.setAttribute('aria-label','Communauté Discord : environ '+result.online+' membres en ligne sur '+result.members);discordCounter.title='Statistiques approximatives de la communauté';return true;
+}
 async function refreshDiscordCounter(){
-  if(!discordCounter)return;
+  if(!discordCounter||counterBusy)return;counterBusy=true;
   try{
     const response=await fetch('/api/discord/community',{cache:'no-cache'});
     if(!response.ok)throw Error('Unavailable');
     const result=await response.json();
-    if(!result.available||!Number.isSafeInteger(result.members)||result.members<0||
-      !Number.isSafeInteger(result.online)||result.online<0||result.online>result.members)throw Error('Invalid stats');
-    discordCounter.querySelector('[data-discord-online]').textContent=result.online.toLocaleString('fr-FR');
-    discordCounter.querySelector('[data-discord-total]').textContent=result.members.toLocaleString('fr-FR');
-    discordCounter.setAttribute('aria-label',
-      'Rejoindre le serveur Discord Bro Client. Environ '+result.online+' membres en ligne sur '+result.members+' membres.');
-    discordCounter.title='Rejoindre le Discord Bro Client · Statistiques approximatives';
+    if(!paintCounter(result))throw Error('Invalid stats');
+    try{sessionStorage.setItem('bro-counter-v1',JSON.stringify({at:Date.now(),value:result}));}catch{}
   }catch{
-    discordCounter.setAttribute('aria-label','Rejoindre le serveur Discord Bro Client. Statistiques indisponibles.');
-  }
+    if(discordCounter.querySelector('[data-discord-total]').textContent==='—')discordCounter.setAttribute('aria-label','Statistiques de la communauté indisponibles.');
+  }finally{counterBusy=false;}
 }
 if(discordCounter){
+  try{const saved=JSON.parse(sessionStorage.getItem('bro-counter-v1'));if(saved&&Date.now()-saved.at<300000)paintCounter(saved.value);}catch{}
   refreshDiscordCounter();
   setInterval(()=>{if(document.visibilityState==='visible')refreshDiscordCounter();},120000);
 }
@@ -504,12 +528,12 @@ if(discordCounter){
 /* Compact verified Whop activity. Never infer purchaser identity from a login alone. */
 const recentBoard=document.getElementById('purchaseBoard');
 const recentIndicator=document.querySelector('.purchase-live-indicator');
-let lastFeedSignature='';
+let lastFeedSignature='',feedBusy=false;
 let lastTopPurchase=null;
 function updateRecentStatus(state){
  if(!recentIndicator)return;
- const indicatorState=state==='error'||state==='not_configured'?'error':state==='ok'?'ok':'loading';
- const labels={ok:'À jour',error:'Indisponible',loading:'Chargement'};
+ const indicatorState=state==='error'||state==='not_configured'?'error':state==='ok'?'ok':state==='cached'?'cached':'loading';
+ const labels={ok:'À jour',error:'Indisponible',loading:'Chargement',cached:'Dernier relevé'};
  const label=recentIndicator.querySelector('.purchase-live-text');
  recentIndicator.dataset.state=indicatorState;
  if(label)label.textContent=labels[indicatorState];
@@ -560,22 +584,25 @@ function renderRecentFeed(data){
  recentBoard.replaceChildren(...rows);
 }
 async function refreshRecentBoard(){
- if(!recentBoard)return;
+ if(!recentBoard||feedBusy)return;feedBusy=true;
  try{
   const response=await fetch('/api/activity',{cache:'no-store'});
   if(!response.ok)throw Error('feed_unavailable');
   const data=await response.json();
   if(!Array.isArray(data.purchases))throw Error('bad_feed');
   renderRecentFeed(data);
+  // The browser snapshot never stores Discord names, avatars or private account data.
+  try{sessionStorage.setItem('bro-feed-v1',JSON.stringify({at:Date.now(),purchases:data.purchases.slice(0,5).map(p=>({plan:p.plan,amount:p.amount,date:p.date,currency:p.currency,name:'Client BRO',avatar:null}))}));}catch{}
  }catch{
   updateRecentStatus('error');
   if(!recentBoard.querySelector('.purchase-card')){
    recentBoard.replaceChildren(block('p','Achats indisponibles pour le moment.','purchase-board-empty'));
   }
- }
+ }finally{feedBusy=false;}
 }
 if(recentBoard){
  recentBoard.setAttribute('role','list');
+ try{const saved=JSON.parse(sessionStorage.getItem('bro-feed-v1'));if(saved&&Date.now()-saved.at<120000&&Array.isArray(saved.purchases))renderRecentFeed({purchases:saved.purchases,sync:{state:'cached'}});}catch{}
  refreshRecentBoard();
  setInterval(()=>{if(document.visibilityState==='visible')refreshRecentBoard();},15000);
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshRecentBoard();});
