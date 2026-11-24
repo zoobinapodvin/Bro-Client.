@@ -2,7 +2,7 @@ import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
 import {session,exchange,startDiscord,clear,disconnectDiscord,destination} from '../lib/auth.mjs';
 import {createCheckout,handleBilling,hasConfirmedPurchase,attachVerifiedPayment,recoverAttributedPayment} from '../lib/billing.mjs';
-import {authenticatedCheckoutDestination} from '../lib/checkout.mjs';
+import {authenticatedCheckoutDestination,validWhopPlan} from '../lib/checkout.mjs';
 import {registerAccount,listAccounts,findAccount,readAccount} from '../lib/accounts.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
@@ -261,12 +261,8 @@ export default async function handler(req,res) {
       if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
       // Require the verified Discord session before any Whop redirect.
       // A direct fallback cannot automatically grant account entitlements.
-      if(!user?.discordId)return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent('/offres'));
-      const target=new URL(plan.checkoutUrl);
-      if(target.protocol!=='https:'||!['whop.com','www.whop.com'].includes(target.hostname)||
-        !/^\/checkout\/plan_[A-Za-z0-9]+\/?$/.test(target.pathname)||
-        target.username||target.password||target.port||target.search||target.hash)
-        return res.redirect(302,'/offres');
+      if(!user?.discordId)return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent(path));
+      try{validWhopPlan(plan.checkoutUrl);}catch{return res.redirect(302,'/offres');}
       try{
         // Preferred: per-session Whop checkout with a server-stored random
         // order ref in metadata, so the signed webhook can identify Discord.

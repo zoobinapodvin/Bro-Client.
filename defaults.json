@@ -52,7 +52,7 @@
       "duration": "1 jour",
       "price": 6,
       "description": "Pour découvrir le client.",
-      "checkoutUrl": "https://whop.com/checkout/plan_MCtWYReKKKb9m/"
+      "checkoutUrl": "https://whop.com/modelya/bro-client-1-jour-51"
     },
     {
       "id": "week",
@@ -60,7 +60,7 @@
       "duration": "1 semaine",
       "price": 15,
       "description": "Pour plusieurs sessions.",
-      "checkoutUrl": "https://whop.com/checkout/plan_kPcl5mzGmRq2Q/"
+      "checkoutUrl": "https://whop.com/modelya/bro-client-1-semaine-a7"
     },
     {
       "id": "month",
@@ -68,7 +68,7 @@
       "duration": "1 mois",
       "price": 35,
       "description": "Pour jouer au quotidien.",
-      "checkoutUrl": "https://whop.com/checkout/plan_iN2Oc79WLycrs/"
+      "checkoutUrl": "https://whop.com/modelya/bro-client-1-mois-be/"
     },
     {
       "id": "life",
@@ -76,7 +76,7 @@
       "duration": "À vie",
       "price": 100,
       "description": "Pour un accès permanent.",
-      "checkoutUrl": "https://whop.com/checkout/plan_p90wN1m6OLoEH/"
+      "checkoutUrl": "https://whop.com/modelya/bro-client-lifetime/"
     }
   ]
 }
