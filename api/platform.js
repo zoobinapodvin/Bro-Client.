@@ -6,7 +6,7 @@ import {authenticatedCheckoutDestination} from '../lib/checkout.mjs';
 import {registerAccount,listAccounts,findAccount,readAccount} from '../lib/accounts.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
-import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
+import {accountOverview,readCustomerKey} from '../lib/fulfillment.mjs';
 import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary} from '../lib/activity.mjs';
 import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
 import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
@@ -212,21 +212,10 @@ export default async function handler(req,res) {
       res.setHeader('Content-Disposition','attachment; filename="BroClient-key.txt"');
       return res.end('BRO CLIENT — Clé privée\\r\\n'+key+'\\r\\n');
     }
-    if(path==='/api/account/download'&&req.method==='GET'){
-      if(!user?.discordId)return res.status(401).end();
-      if(!await hasActivePurchase(bucket,user.discordId))return res.status(403).end();
-      const file=await bucket.get(RELEASE_PATH);
-      if(!file)return res.status(404).json({error:'Le programme sera bientôt disponible.'});
-      res.setHeader('Content-Type','application/octet-stream');
-      res.setHeader('Content-Disposition','attachment; filename="BroClient.exe"');
-      res.setHeader('X-Content-Type-Options','nosniff');
-      for await(const chunk of file.body)res.write(chunk);
-      return res.end();
-    }
-    if(path==='/api/admin/release'&&req.method==='POST'){
-      if(!user?.admin||!user.discordId)return res.status(403).end();
-      const result=await storeRelease(bucket,payload);
-      return res.status(result.status==='stored'?201:422).json(result);
+    // The former launcher is no longer distributed or accepted for publication.
+    if(path==='/api/account/download'||path==='/api/admin/release'){
+      res.setHeader('Cache-Control','no-store');
+      return res.status(410).json({error:'La distribution du launcher a été arrêtée.'});
     }
     if(path==='/api/discord/status'&&req.method==='GET'){
       if(!user)return res.status(401).end();

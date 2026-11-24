@@ -111,7 +111,7 @@ async function account(){
     const welcome=block('section',undefined,'portal-welcome');
     welcome.append(block('span','BRO CLIENT · ESPACE PRIVÉ','client-kicker'),
       block('h3','Retrouve tes accès en un seul endroit.'),
-      block('p','Connecte ton compte Discord pour consulter tes achats et tes téléchargements.'));
+      block('p','Connecte ton compte Discord pour consulter tes achats.'));
     const callbackStatus=new URLSearchParams(location.search).get('connexion');
     if(callbackStatus==='interrompue'||callbackStatus==='indisponible'){
       welcome.append(block('p',callbackStatus==='interrompue'?'La connexion Discord a été interrompue. Tu peux réessayer.':'Discord est temporairement indisponible. Réessaie dans un instant.'));
@@ -224,13 +224,7 @@ async function account(){
       pass.append(block('span','PASS ACTIF','client-kicker'),block('strong',display[last?.planId]||'Bro Client'),
         block('span',last?.planId==='life'?'Accès à vie':'Actif','client-tag-active'));
       viewport.append(pass);
-      const files=block('div',undefined,'portal-download-row');
-      files.append(block('strong','BroClient.exe'));
-      if(overview.downloadAvailable){
-        const download=link('Télécharger','/api/account/download','btn client-button-primary portal-action');
-        download.setAttribute('download','BroClient.exe');files.append(download);
-      }else files.append(block('span','Version en préparation','client-quiet'));
-      viewport.append(files);
+      viewport.append(block('p','La distribution du launcher a été arrêtée. Pour toute question concernant un achat antérieur, contacte le support.','client-quiet'));
       if(overview.keyAvailable){
         const keyRow=block('div',undefined,'portal-key-row');
         keyRow.append(block('span','MA CLÉ','client-kicker'));
@@ -297,7 +291,7 @@ async function account(){
       ordersLink.target='_blank';ordersLink.rel='noopener noreferrer';viewport.append(ordersLink);
       viewport.append(profileVisibilitySetting());
     }else if(tab==='help'){
-      viewport.append(block('h3','Besoin d’aide ?'),block('p','Guides, téléchargements et assistance sur le serveur Bro Client.','client-quiet'));
+      viewport.append(block('h3','Besoin d’aide ?'),block('p','Guides et assistance sur le serveur Bro Client.','client-quiet'));
       const links=block('div',undefined,'portal-help-actions');
       links.append(link('Consulter les guides','/guides','btn client-button-primary'));
       const guild=discordButton('Discord et tickets','https://discord.gg/uRQyKBhhgA','btn client-discord-link portal-action');
@@ -355,17 +349,6 @@ async function account(){
         finally{submit.disabled=false;}
       };
       registry.append(form);area.append(registry);
-      const upload=block('input');upload.type='file';upload.accept='.exe,application/octet-stream';
-      upload.setAttribute('aria-label','Importer le programme autorisé');
-      area.append(upload);
-      area.append(smallButton('Publier BroClient.exe',async()=>{
-        if(!upload.files?.[0]){status('Sélectionne le fichier autorisé.');return;}
-        try{
-          status('Import privé en cours…');
-          const response=await fetch('/api/admin/release',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:upload.files[0]});
-          if(!response.ok)throw Error();status('Programme publié.');await refresh();
-        }catch{status('Import refusé ou indisponible.');}
-      },'btn client-button-primary'));
       viewport.append(area);
     }
   }

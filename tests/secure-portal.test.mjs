@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {listPaidPurchases,accountOverview,assignKey,readCustomerKey,encryptCustomerKey,
- decryptCustomerKey,validUploadedExe} from '../lib/fulfillment.mjs';
+ decryptCustomerKey,validUploadedExe,storeRelease} from '../lib/fulfillment.mjs';
 import {handleInteraction} from '../lib/discord.mjs';
 import {readFileSync} from 'node:fs';
 
@@ -61,7 +61,10 @@ test('unknown and broken executables are never accepted',()=>{
 test('portal contains only authenticated delivery endpoints and a real refresh action',()=>{
  const site=readFileSync(new URL('../app.js',import.meta.url),'utf8');
  assert.ok(site.includes('/api/account/overview'));
- assert.ok(site.includes('/api/account/download'));
+ assert.ok(!site.includes('/api/account/download'));
+ assert.ok(!site.includes('/api/admin/release'));
+ const api=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
+ assert.match(api,/res\.status\(410\)/);
  assert.ok(site.includes('/api/account/key.txt'));
  assert.ok(site.includes('Actualiser mes achats'));
  assert.ok(site.includes('discordMark'));
@@ -96,4 +99,10 @@ test('signed /startkey is restricted to both the owner and staff channel',async 
  const approved=await dispatch(payload(owner,channel));
  assert.match(approved.body.data.content,/attribuée/);
  assert.equal(await readCustomerKey(store,buyer),'TEST-KEY-123');
+});
+
+test('discontinued launcher cannot be offered or republished even with an existing file',async()=>{
+ const b=bucket({...ledger(),'private/releases/BroClient.exe':{old:true}});
+ assert.equal((await accountOverview(b,{discordId:buyer})).downloadAvailable,false);
+ assert.deepEqual(await storeRelease(b,Buffer.alloc(0)),{status:'distribution_discontinued'});
 });
