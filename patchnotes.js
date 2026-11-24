@@ -4,11 +4,12 @@ const create=(tag,content,cls)=>{const el=document.createElement(tag);if(content
 const alertBox=$('#patchnotesAlert');
 const list=$('#patchnotesList');
 const admin=$('#patchnotesAdmin');
-let isEditor=false,editing=null,all=[];
+let isEditor=false,editing=null,editingUpdatedAt=null,all=[],busy=false;
 const safeId=id=>/^[a-z0-9][a-z0-9-]{1,110}$/.test(id??'');
 const formatDate=value=>value&&Number.isFinite(Date.parse(value))?new Intl.DateTimeFormat('fr-FR',{dateStyle:'long',timeZone:'Europe/Paris'}).format(new Date(value)):'';
 function showMessage(text,kind='info'){
  alertBox.hidden=false;alertBox.textContent=text;alertBox.dataset.kind=kind;
+ if(kind==='error')alertBox.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 async function api(path,options){
  const res=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});
@@ -26,7 +27,7 @@ function renderBody(target,value){
  }
 }
 function fillEditor(note){
- editing=note?.id??null;
+ editing=note?.id??null;editingUpdatedAt=note?.updatedAt??null;
  $('#patchnoteVersion').value=note?.version||'';
  $('#patchnoteTitle').value=note?.title||'';
  $('#patchnoteSummary').value=note?.summary||'';
@@ -71,27 +72,45 @@ async function refresh(){
   loadDetail(result.note);
  }else loadList(all);
 }
-$('#patchnotesNew').addEventListener('click',()=>fillEditor(null));
+function setBusy(value){busy=value;$('#patchnoteSave').disabled=value;$('#patchnoteDelete').disabled=value;$('#patchnotesNew').disabled=value;}
+$('#patchnotesNew').addEventListener('click',()=>{if(!busy)fillEditor(null);});
 $('#patchnotesForm').addEventListener('submit',async e=>{
- e.preventDefault();if(!isEditor)return;
- const save=$('#patchnoteSave');save.disabled=true;
+ e.preventDefault();if(!isEditor||busy)return;
+ setBusy(true);
  try{
-  const payload={action:editing?'update':'create',id:editing,version:$('#patchnoteVersion').value,
+  const payload={action:editing?'update':'create',id:editing,...(editing&&editingUpdatedAt?{expectedUpdatedAt:editingUpdatedAt}:{}),version:$('#patchnoteVersion').value,
    title:$('#patchnoteTitle').value,summary:$('#patchnoteSummary').value,content:$('#patchnoteBody').value,
    publish:$('#patchnotePublish').checked};
   const result=await api('/api/patchnotes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  showMessage(result.item.status==='published'?'Mise à jour publiée.':'Brouillon enregistré.','success');
-  if(result.item.status==='published')location.assign('/patchnotes/'+encodeURIComponent(result.item.id));
-  else location.assign('/patchnotes');
- }catch(error){showMessage(error.message,'error');save.disabled=false;}
+  if(!result.item||!safeId(result.item.id)||(editing&&result.item.id!==editing))throw Error('La sauvegarde n’a pas été confirmée.');
+  const url='/patchnotes/'+encodeURIComponent(result.item.id);
+  history.replaceState(null,'',url);
+  loadDetail(result.item);
+  showMessage(result.item.status==='published'?'Mise à jour enregistrée et publiée.':'Brouillon enregistré.','success');
+ }catch(error){showMessage(error.message,'error');}
+ finally{setBusy(false);}
 });
 $('#patchnoteDelete').addEventListener('click',async()=>{
- if(!isEditor||!editing||!confirm('Supprimer définitivement cette mise à jour ?'))return;
+ if(!isEditor||!editing||busy||!confirm('Supprimer définitivement cette mise à jour ?'))return;
+ setBusy(true);
  try{
-  await api('/api/patchnotes',{method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({action:'delete',id:editing})});
-  location.assign('/patchnotes');
+  const deletedId=editing;
+  const result=await api('/api/patchnotes',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({action:'delete',id:deletedId,...(editingUpdatedAt?{expectedUpdatedAt:editingUpdatedAt}:{})})});
+  if(result.deleted!==true)throw Error('La suppression n’a pas été confirmée.');
+  // Leave the deleted detail immediately; the fresh index is authoritative.
+  history.replaceState(null,'','/patchnotes');
+  $('#patchnotesDetail').hidden=true;$('#patchnotesIndex').hidden=false;
+  $('#patchnotesTitle').textContent='Journal des mises à jour.';
+  $('#patchnotesSubtitle').textContent='Toutes les évolutions du client Rob Run, correctifs et nouvelles fonctionnalités, au même endroit.';
+  document.title='Patchnotes · BRO CLIENT';
+  fillEditor(null);
+  all=all.filter(note=>note.id!==deletedId);loadList(all);
+  showMessage('Mise à jour supprimée.','success');
+  try{const data=await api('/api/patchnotes');isEditor=data.editor===true;admin.hidden=!isEditor;all=data.notes||[];loadList(all);}
+  catch{showMessage('Mise à jour supprimée. Actualise la page pour recharger la liste.','success');}
  }catch(error){showMessage(error.message,'error');}
+ finally{setBusy(false);}
 });
 $('#patchnotesReplay').addEventListener('click',async()=>{
  if(!isEditor)return;
