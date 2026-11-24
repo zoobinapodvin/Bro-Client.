@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {listPaidPurchases,accountOverview,assignKey,readCustomerKey,encryptCustomerKey,
- decryptCustomerKey,validUploadedExe,storeRelease,addStockKey,queuePaidKey,stockOverview,ownerStockPath} from '../lib/fulfillment.mjs';
+ decryptCustomerKey,validUploadedExe,storeRelease,addStockKey,queuePaidKey,stockOverview,ownerStockPath,revealStockKey} from '../lib/fulfillment.mjs';
 import {handleInteraction} from '../lib/discord.mjs';
 import {readFileSync} from 'node:fs';
 
@@ -136,4 +136,11 @@ test('legacy keys are reserved against duplicate stock and not exposed to other 
  assert.equal((await addStockKey(store,{planId:'week',key:'TEST-LEGACY-KEY',operatorId:'1027596385123565569'})).status,'duplicate');
  assert.equal(await readCustomerKey(store,buyer,'legacy'),'TEST-LEGACY-KEY');
  assert.equal(await readCustomerKey(store,'1574096900000000004','legacy'),null);
+});
+test('owner-only stock reveal returns exactly the selected key, never another user’s secret',async t=>{
+ const old=process.env.BRO_KEY_ENCRYPTION_KEY;process.env.BRO_KEY_ENCRYPTION_KEY='d'.repeat(64);t.after(()=>{if(old===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=old;});
+ const admin='1027596385123565569',store=bucket();const added=await addStockKey(store,{planId:'week',key:'TEST-REVEAL-01',operatorId:admin});
+ assert.equal(added.status,'added');const view=await stockOverview(store);assert.equal(view.rows[0].id,added.id);assert.ok(!JSON.stringify(view).includes('TEST-REVEAL-01'));
+ assert.equal(await revealStockKey(store,{discordId:admin},added.id),'TEST-REVEAL-01');assert.equal(await revealStockKey(store,{discordId:buyer,admin:true},added.id),null);assert.equal(await revealStockKey(store,null,added.id),null);
+ const ui=readFileSync(new URL('../key-stock.js',import.meta.url),'utf8');assert.match(ui,/\/api\/admin\/key-stock/);assert.match(ui,/aria-busy/);
 });
