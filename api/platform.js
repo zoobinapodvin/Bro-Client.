@@ -16,6 +16,8 @@ import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides,CUST
 async function rememberAccount(user){
  try{return await registerAccount(bucket,user);}catch(error){console.error('Bro account registry unavailable',error?.name);return null;}
 }
+// Temporary pause requested by the owner. Resume only on explicit instruction.
+process.env.BRO_KEY_DELIVERY_PAUSED ??= 'true';
 const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET,WHOP_CHECKOUT_API_KEY:process.env.WHOP_CHECKOUT_API_KEY};
 async function body(req,max) {
   const chunks=[];let size=0;
@@ -292,6 +294,7 @@ export default async function handler(req,res) {
       return await respond(res,path==='/api/site'?await saveSite(request,bucket):await upload(request,bucket));
     }
     if(/^\/checkout\/(day|week|month|life)$/.test(path)&&req.method==='GET'){
+      if(process.env.BRO_KEY_DELIVERY_PAUSED==='true')return res.redirect(302,'/offres');
       
       const {site:config}=await site();const plan=config.plans.find(p=>path==='/checkout/'+p.id);
       if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
