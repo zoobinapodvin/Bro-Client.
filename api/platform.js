@@ -318,36 +318,76 @@ export default async function handler(req,res) {
     }
     if(/^\/checkout\/(day|week|month|life)$/.test(path)&&req.method==='GET'){
       const planId=path.split('/').pop();
+      const refParam=parsed.searchParams.get('tebex_order');
       if(!user?.discordId||!/^\d{17,20}$/.test(user.discordId))
         return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent(path));
       try{
         const packageId={day:'7832046',week:'7832045',month:'7832044',life:'7832042'}[planId];
-        const token=process.env.TEBEX_PUBLIC_TOKEN;
+        const token=process.env.TEBEX_PUBLIC_TOKEN?.trim();
         if(!token||!process.env.TEBEX_WEBHOOK_SECRET)throw Error('tebex_not_configured');
-        const ref=crypto.randomUUID();
         const api='https://headless.tebex.io/api';
+        const account='/accounts/'+encodeURIComponent(token);
+        const owner=createHash('sha256').update(String(user.id)).digest('hex');
         const call=async (path,body)=>{
-          const r=await fetch(api+path,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(8000)});
-          if(!r.ok)throw Error('tebex_http_'+r.status);
-          const result=await r.json();
+          const r=await fetch(api+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','Accept':'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(8000)});
+          const result=await r.json().catch(()=>({}));
+          if(!r.ok){
+            const error=Error('tebex_http_'+r.status);
+            error.loginRequired=r.status===422&&/user must login|login before|log in before|authentication required/i.test(JSON.stringify({message:result.message,detail:result.detail,errors:result.errors,title:result.title}));
+            throw error;
+          }
           return result.data??result;
         };
-        const basket=await call('/accounts/'+encodeURIComponent(token)+'/baskets',{
-          complete_url:'https://www.broclient.com/#compte',
-          cancel_url:'https://www.broclient.com/offres',
-          complete_auto_redirect:true,
-          custom:{bro_order:ref}
-        });
-        if(typeof basket.ident!=='string'||!/^[A-Za-z0-9-]{10,128}$/.test(basket.ident))throw Error('tebex_basket_invalid');
-        const filled=await call('/baskets/'+encodeURIComponent(basket.ident)+'/packages',{package_id:packageId,quantity:1});
+        const targetUrl=(raw,auth=false)=>{
+          const target=new URL(raw??'');
+          const allowed=auth?(target.hostname==='tebex.io'||target.hostname.endsWith('.tebex.io')):['checkout.tebex.io','pay.tebex.io'].includes(target.hostname);
+          if(target.protocol!=='https:'||!allowed||target.username||target.password||target.port)throw Error('tebex_redirect_invalid');
+          return target.href;
+        };
+        let ref,basket,order,orderKey;
+        if(refParam!==null){
+          if(!/^[a-f0-9-]{36}$/.test(refParam))throw Error('tebex_order_invalid');
+          ref=refParam;orderKey='private/tebex/orders/'+ref+'.json';
+          const stored=await bucket.get(orderKey);
+          order=stored?await stored.json():null;
+          if(!order||order.provider!=='tebex'||order.planId!==planId||order.packageId!==packageId||order.discordId!==user.discordId||order.owner!==owner||
+            !Number.isFinite(Date.parse(order.createdAt))||Date.now()-Date.parse(order.createdAt)>60*60*1000)throw Error('tebex_order_invalid');
+          basket=await call(account+'/baskets/'+encodeURIComponent(order.basketId));
+          if(basket.ident!==order.basketId||basket.complete===true)throw Error('tebex_basket_mismatch');
+        }else{
+          ref=crypto.randomUUID();orderKey='private/tebex/orders/'+ref+'.json';
+          basket=await call(account+'/baskets',{
+            complete_url:'https://www.broclient.com/#compte',
+            cancel_url:'https://www.broclient.com/offres',
+            complete_auto_redirect:true,
+            custom:{bro_order:ref}
+          });
+          if(typeof basket.ident!=='string'||!/^[A-Za-z0-9-]{10,128}$/.test(basket.ident))throw Error('tebex_basket_invalid');
+          order={provider:'tebex',planId,packageId,basketId:basket.ident,discordId:user.discordId,owner,createdAt:new Date().toISOString()};
+          if(!await bucket.put(orderKey,JSON.stringify(order),{onlyIf:{etagDoesNotMatch:'*'}}))throw Error('tebex_order_not_saved');
+        }
+        const pkg=await call(account+'/packages/'+packageId);
+        if(String(pkg.id)!==packageId)throw Error('tebex_package_mismatch');
+        const ident=typeof pkg.ident==='string'&&pkg.ident?pkg.ident:packageId;
+        let filled=basket;
+        if(Array.isArray(basket.packages)&&basket.packages.length){
+          if(basket.packages.length!==1||String(basket.packages[0].id??basket.packages[0].package?.id)!==packageId||Number(basket.packages[0].in_basket?.quantity??basket.packages[0].quantity??1)!==1)throw Error('tebex_basket_contents_mismatch');
+        }else{
+          try{filled=await call('/baskets/'+encodeURIComponent(basket.ident)+'/packages',{package_id:ident,quantity:1});}
+          catch(error){
+            if(!error.loginRequired||refParam!==null)throw error;
+            const callback='https://www.broclient.com'+path+'?tebex_order='+encodeURIComponent(ref);
+            const providers=await call(account+'/baskets/'+encodeURIComponent(basket.ident)+'/auth?returnUrl='+encodeURIComponent(callback));
+            if(!Array.isArray(providers)||!providers.length)throw Error('tebex_auth_unavailable');
+            const urls=providers.map(p=>targetUrl(p.url,true));
+            res.setHeader('Referrer-Policy','no-referrer');
+            return res.redirect(303,urls[0]);
+          }
+        }
         if(filled.ident!==basket.ident||filled.complete===true)throw Error('tebex_basket_mismatch');
-        const target=new URL(filled.links?.checkout??'');
-        if(target.protocol!=='https:'||!['checkout.tebex.io','pay.tebex.io'].includes(target.hostname)||target.username||target.password||target.port)throw Error('tebex_checkout_invalid');
-        const order={provider:'tebex',planId,packageId,basketId:basket.ident,discordId:user.discordId,owner:createHash('sha256').update(String(user.id)).digest('hex'),createdAt:new Date().toISOString()};
-        const saved=await bucket.put('private/tebex/orders/'+ref+'.json',JSON.stringify(order),{onlyIf:{etagDoesNotMatch:'*'}});
-        if(!saved)throw Error('tebex_order_not_saved');
+        const target=targetUrl(filled.links?.checkout);
         res.setHeader('Referrer-Policy','no-referrer');
-        return res.redirect(303,target.href);
+        return res.redirect(303,target);
       }catch(error){
         console.error('Tebex checkout unavailable',{plan:planId,reason:String(error?.message||'unknown').slice(0,80)});
         return res.redirect(303,'/offres?paiement=indisponible');

@@ -13,36 +13,18 @@ for(const path of ['index.html','offres.html','app.js','style.css','assets','def
 await cp('guides.css','dist/guides.css');
 
 
- // One-time integration diagnostic: unpaid basket only, no charge, no buyer data.
- if(process.env.VERCEL_ENV==='production' && process.env.TEBEX_PUBLIC_TOKEN){
-  const {randomUUID}=await import('node:crypto');
+// One-time production smoke test: creates no payment or customer entitlement.
+if(process.env.VERCEL_ENV==='production'&&process.env.TEBEX_PUBLIC_TOKEN){
+ try{
   const token=process.env.TEBEX_PUBLIC_TOKEN.trim();
-  const base='https://headless.tebex.io/api';
-  const probe=async(stage,path,body)=>{
-   const r=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','Accept':'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(7000)});
-   const j=await r.json().catch(()=>({}));
-   const detail=JSON.stringify({message:j.message,title:j.title,detail:j.detail,errors:j.errors}).toLowerCase();
-   const kinds=['token','webstore','account','package','quantity','username','auth','ip_address','complete_url','cancel_url','custom','not found','not enabled','not available','required','invalid'];
-   console.log('Tebex diagnostic',stage,r.status,kinds.filter(k=>detail.includes(k)).join(','));
-   if(!r.ok){
-     const message=String(j.detail||j.message||j.title||'').replace(/[^a-zA-Z0-9 .,:'_-]/g,' ').replace(/[a-zA-Z0-9_-]{16,}/g,'[redacted]').slice(0,180);
-     console.log('Tebex validation message',stage,message);
-   }
-   return r.ok?(j.data??j):null;
-  };
-  try{
-   const store=await probe('store','/accounts/'+encodeURIComponent(token));
-   if(store){
-    for(const id of ['7832046','7832045','7832044','7832042']){
-     const p=await probe('package '+id,'/accounts/'+encodeURIComponent(token)+'/packages/'+id);
-     if(p){ console.log('Tebex catalog match',id,String(p.id)===id,'ident present',typeof p.ident==='string','type',String(p.type??'unknown').replace(/[^a-z0-9_-]/gi,'').slice(0,30)); if(id==='7832046')globalThis.broProbePackage=p; }
-    }
-    const basket=await probe('create','/accounts/'+encodeURIComponent(token)+'/baskets',{complete_url:'https://www.broclient.com/',cancel_url:'https://www.broclient.com/offres',complete_auto_redirect:true,custom:{bro_order:randomUUID()}});
-    if(basket?.ident){
-     const p=globalThis.broProbePackage;
-     const result=await probe('add-ident','/baskets/'+encodeURIComponent(basket.ident)+'/packages',{package_id:String(p?.ident||p?.id||'7832046'),quantity:1});
-     if(result)console.log('Tebex checkout link returned',Boolean(result.links?.checkout));
-    }
-   }
-  }catch(error){console.log('Tebex diagnostic network error',error?.name);}
- }else console.log('Tebex diagnostic unavailable in build environment');
+  const api='https://headless.tebex.io/api/accounts/'+encodeURIComponent(token);
+  const result=await fetch(api+'/baskets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({complete_url:'https://www.broclient.com/',cancel_url:'https://www.broclient.com/offres',custom:{bro_probe:true}}),signal:AbortSignal.timeout(7000)});
+  const j=await result.json();
+  const basket=j.data??j;
+  if(!result.ok||!basket.ident)throw Error('basket_create');
+  const auth=await fetch(api+'/baskets/'+encodeURIComponent(basket.ident)+'/auth?returnUrl='+encodeURIComponent('https://www.broclient.com/checkout/day'),{signal:AbortSignal.timeout(7000)});
+  const a=await auth.json();
+  const providers=a.data??a;
+  console.log('Tebex smoke test: auth status',auth.status,'providers',Array.isArray(providers)?providers.map(p=>({name:String(p.name).replace(/[^a-zA-Z0-9 _-]/g,'').slice(0,30),host:new URL(p.url).hostname})):[]);
+ }catch(e){console.log('Tebex smoke test unsuccessful',e?.name);}
+}

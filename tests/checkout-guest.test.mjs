@@ -84,7 +84,7 @@ test('old persisted checkout URLs migrate while preserving other storefront sett
  assert.equal((await readSite(bucket)).site.plans[0].checkoutUrl,legacyPlan.checkoutUrl);
 });
 
-test('Tebex checkout selects the exact package for each pass, stores attribution and rejects guests and off-domain links',async()=>{
+test('Tebex checkout uses catalog ident, supports required authentication and preserves private attribution',async()=>{
  const src=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
  const start=src.indexOf("    if(/^\\/checkout\\/(day|week|month|life)$/.test(path)&&req.method==='GET'){");
  const end=src.indexOf("\n    return res.status(404).end();",start);
@@ -92,33 +92,51 @@ test('Tebex checkout selects the exact package for each pass, stores attribution
  const {runInNewContext}=await import('node:vm');
  const {createHash,randomUUID}=await import('node:crypto');
  const mapping={day:'7832046',week:'7832045',month:'7832044',life:'7832042'};
- const run=async(plan,user,checkout='https://checkout.tebex.io/checkout/test-basket-123')=>{
-  const calls=[],orders=[],redirects=[];
-  const context={path:'/checkout/'+plan,req:{method:'GET'},user,process:{env:{TEBEX_PUBLIC_TOKEN:'test-token',TEBEX_WEBHOOK_SECRET:'test-secret'}},crypto:{randomUUID},createHash,URL,AbortSignal,
-    console:{error(){}},bucket:{put:async(k,v,o)=>{orders.push({k,record:JSON.parse(v),o});return {etag:'saved'};}},
-    fetch:async(url,opts)=>{calls.push({url,body:JSON.parse(opts.body)});return {ok:true,json:async()=>calls.length===1?{data:{ident:'test-basket-123'}}:{ident:'test-basket-123',complete:false,links:{checkout}}};},
+ const checkout='https://checkout.tebex.io/checkout/test-basket-123';
+ const verified={id:'verified-user',discordId:'1574096900000000001'};
+ const run=async(plan,user,{auth=false,callback=null,records=new Map(),target=checkout}={})=>{
+  const calls=[],redirects=[];
+  const context={path:'/checkout/'+plan,parsed:{searchParams:new URLSearchParams(callback?'tebex_order='+callback:'')},req:{method:'GET'},user,process:{env:{TEBEX_PUBLIC_TOKEN:'test-token',TEBEX_WEBHOOK_SECRET:'test-secret'}},crypto:{randomUUID},createHash,URL,AbortSignal,
+    console:{error(){}},bucket:{get:async k=>records.has(k)?{json:async()=>records.get(k)}:null,put:async(k,v,o)=>{if(records.has(k))return null;records.set(k,JSON.parse(v));return {etag:'saved'};}},
+    fetch:async(url,opts)=>{
+      calls.push({url,body:opts.body?JSON.parse(opts.body):null});
+      if(url.includes('/auth?'))return {ok:true,json:async()=>[{name:'Tebex',url:'https://ident.tebex.io/login'}]};
+      if(url.includes('/accounts/')&&url.endsWith('/packages/'+mapping[plan]))return {ok:true,json:async()=>({data:{id:Number(mapping[plan]),ident:'catalog-'+mapping[plan]}})};
+      if(url.endsWith('/packages')){
+       if(auth&&!callback)return {ok:false,status:422,json:async()=>({detail:'User must login before adding packages to basket'})};
+       return {ok:true,json:async()=>({ident:'test-basket-123',complete:false,links:{checkout:target}})};
+      }
+      return {ok:true,json:async()=>({data:{ident:'test-basket-123',packages:[],complete:false}})};
+    },
     res:{setHeader(){},redirect:(status,url)=>{redirects.push({status,url});return url;}}};
   await runInNewContext('(async()=>{'+src.slice(start,end)+'})()',context);
-  return {calls,orders,redirects};
+  return {calls,records,redirects};
  };
- const verified={id:'verified-user',discordId:'1574096900000000001'};
  for(const [plan,packageId] of Object.entries(mapping)){
   const r=await run(plan,verified);
-  assert.equal(r.calls.length,2);
-  assert.equal(r.calls[1].body.package_id,packageId);
-  assert.equal(r.calls[1].body.quantity,1);
-  assert.equal(r.orders.length,1);
-  assert.equal(r.orders[0].record.discordId,verified.discordId);
-  assert.equal(r.orders[0].record.packageId,packageId);
-  assert.equal(r.orders[0].record.basketId,'test-basket-123');
-  assert.ok(r.orders[0].k.includes(r.calls[0].body.custom.bro_order));
-  assert.equal(r.orders[0].o.onlyIf.etagDoesNotMatch,'*');
-  assert.equal(r.redirects[0].url,'https://checkout.tebex.io/checkout/test-basket-123');
+  assert.equal(r.calls.length,3);
+  assert.equal(r.calls[2].body.package_id,'catalog-'+packageId);
+  assert.equal(r.calls[2].body.quantity,1);
+  const [[key,order]]=[...r.records];
+  assert.equal(order.discordId,verified.discordId);
+  assert.equal(order.packageId,packageId);
+  assert.equal(order.basketId,'test-basket-123');
+  assert.ok(key.includes(r.calls[0].body.custom.bro_order));
+  assert.equal(r.redirects[0].url,checkout);
  }
+ const initial=await run('day',verified,{auth:true});
+ assert.equal(initial.redirects[0].url,'https://ident.tebex.io/login');
+ const ref=initial.calls[0].body.custom.bro_order;
+ assert.ok(new URL(initial.calls[3].url).searchParams.get('returnUrl').includes(ref));
+ const resumed=await run('day',verified,{auth:true,callback:ref,records:initial.records});
+ assert.equal(resumed.redirects[0].url,checkout);
+ assert.equal(resumed.records.size,1);
+ const wrong=await run('day',{...verified,discordId:'1574096900000000002'},{callback:ref,records:initial.records});
+ assert.equal(wrong.calls.length,0);
+ assert.equal(wrong.redirects[0].url,'/offres?paiement=indisponible');
  const guest=await run('day',null);
  assert.equal(guest.calls.length,0);
  assert.match(guest.redirects[0].url,/^\/auth\/discord\?/);
- const invalid=await run('day',verified,'https://evil.invalid/checkout/test');
- assert.equal(invalid.orders.length,0);
+ const invalid=await run('day',verified,{target:'https://evil.invalid/checkout/test'});
  assert.equal(invalid.redirects[0].url,'/offres?paiement=indisponible');
 });
