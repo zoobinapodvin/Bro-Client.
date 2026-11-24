@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
 import {normalizePayment,backfillWhopHistory,recentPurchases,setActivityPreference} from '../lib/activity.mjs';
-import {handleBilling,createCheckout} from '../lib/billing.mjs';
+import {handleBilling,createCheckout,attachVerifiedPayment,recoverAttributedPayment} from '../lib/billing.mjs';
 
 const company='biz_emxZArodB6p2Af';
 const payment=(overrides={})=>({
@@ -205,4 +205,32 @@ test('checkout rejects Whop permission errors without returning an unlinked paym
  globalThis.fetch=async()=>new Response(null,{status:403});
  await assert.rejects(createCheckout({BUCKET:b,WHOP_API_KEY:'test-only',WHOP_ACCOUNT_ID:company,WHOP_WEBHOOK_SECRET:'test-secret'},u,plan,'https://www.broclient.com'),/whop_api_403/);
  assert.equal([...b.map.keys()].filter(k=>k.startsWith('private/invoices/')).length,0);
+});
+
+test('staff reconciliation verifies the actual receipt, links once and blocks conflicting buyers',async t=>{
+ const original=globalThis.fetch;t.after(()=>globalThis.fetch=original);
+ const b=bucket(),oldPut=b.put;
+ b.put=async(key,data,options={})=>{
+  if(options.onlyIf?.etagDoesNotMatch==='*'&&b.map.has(key))return null;
+  return oldPut(key,data);
+ };
+ const env={BUCKET:b,WHOP_API_KEY:'test-only',WHOP_ACCOUNT_ID:company,WHOP_WEBHOOK_SECRET:'test-only'};
+ const u={authId:'auth-A',discordId:'1574096900000000001',username:'bro-a',avatar:null};
+ const other={authId:'auth-B',discordId:'1574096900000000002',username:'bro-b',avatar:null};
+ const operator='1574096900000000003';
+ globalThis.fetch=async(url)=>{if(String(url).includes('/payments/'))return Response.json(payment());return new Response(null,{status:204});};
+ const first=await attachVerifiedPayment(env,u,'pay_TESTabc123',operator);
+ assert.equal(first.status,'linked');
+ assert.equal((await attachVerifiedPayment(env,u,'pay_TESTabc123',operator)).status,'linked');
+ assert.equal((await attachVerifiedPayment(env,other,'pay_TESTabc123',operator)).status,'conflict');
+ assert.equal([...b.map.keys()].filter(k=>k.startsWith('private/invoices/')).length,1);
+ assert.equal([...b.map.keys()].filter(k=>k.startsWith('private/discord-entitlements/')).length,1);
+ assert.equal((await recentPurchases(b))[0].name,'Client BRO');
+ globalThis.fetch=async()=>Response.json(payment({id:'pay_REFUND',refunded_amount:6}));
+ assert.equal((await attachVerifiedPayment(env,u,'pay_REFUND',operator)).status,'invalid_payment');
+});
+test('automatic recovery never links a receipt with no server order',async()=>{
+ const b=bucket();
+ assert.equal(await recoverAttributedPayment({BUCKET:b,WHOP_ACCOUNT_ID:company},payment()),false);
+ assert.equal([...b.map.keys()].filter(k=>k.startsWith('private/discord-entitlements/')).length,0);
 });

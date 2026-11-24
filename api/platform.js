@@ -1,9 +1,9 @@
 import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
 import {session,exchange,startDiscord,clear,disconnectDiscord,destination} from '../lib/auth.mjs';
-import {createCheckout,handleBilling,hasConfirmedPurchase,attachVerifiedPayment} from '../lib/billing.mjs';
+import {createCheckout,handleBilling,hasConfirmedPurchase,attachVerifiedPayment,recoverAttributedPayment} from '../lib/billing.mjs';
 import {authenticatedCheckoutDestination} from '../lib/checkout.mjs';
-import {registerAccount,listAccounts,findAccount} from '../lib/accounts.mjs';
+import {registerAccount,listAccounts,findAccount,readAccount} from '../lib/accounts.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
 import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
@@ -112,7 +112,7 @@ export default async function handler(req,res) {
       try{
         notifications=await reconcilePaymentNotifications(bucket,{
           apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,
-          date:'twoDays',limit:24
+          date:'twoDays',limit:24,onVerifiedPayment:payment=>recoverAttributedPayment(billingEnv,payment)
         });
       }catch(error){console.error('Discord purchase recovery failed',error?.name);}
       return res.json({roles,notifications});
@@ -173,7 +173,7 @@ export default async function handler(req,res) {
         return res.status(503).json({error:'Vérifie les identifiants Whop dans Vercel.'});
       const result=await reconcilePaymentNotifications(bucket,{
         apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,
-        date:'today',limit:60
+        date:'today',limit:60,onVerifiedPayment:payment=>recoverAttributedPayment(billingEnv,payment)
       });
       return res.status(result.status==='whop_error'?502:200).json(result);
     }
@@ -183,14 +183,15 @@ export default async function handler(req,res) {
       if(req.method==='POST'){
         const choice=JSON.parse(payload.toString());
         if(typeof choice?.showPublic!=='boolean')return res.status(422).end();
-        return res.json(await setActivityPreference(bucket,user,choice.showPublic));
+        let profile=null;try{profile=await readAccount(bucket,user.discordId);}catch{}
+        return res.json(await setActivityPreference(bucket,{...user,username:profile?.username},choice.showPublic));
       }
       return res.status(405).end();
     }
     if(path==='/api/admin/activity/backfill'&&req.method==='POST'){
       if(!user?.admin)return res.status(403).end();
       if(!billingEnv.WHOP_API_KEY)return res.status(503).json({error:'Connecte la clé API Whop dans Vercel.'});
-      const result=await backfillWhopHistory(bucket,{apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID});
+      const result=await backfillWhopHistory(bucket,{apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,onVerifiedPayment:payment=>recoverAttributedPayment(billingEnv,payment)});
       if(result.imported>0)result.discordSummary=await sendHistoricalSummary(bucket,result);
       return res.json(result);
     }

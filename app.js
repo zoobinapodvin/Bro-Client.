@@ -319,11 +319,11 @@ async function account(){
         try{
           const response=await fetch('/api/admin/activity/backfill',{method:'POST'});
           const data=await response.json();if(!response.ok)throw Error(data.error||'Whop indisponible');
-          status(data.imported+' achat(s) historique(s) ajoutés au tableau.');
+          status(data.imported+' achat(s) historique(s) ajouté(s), '+(data.linked||0)+' référence(s) vérifiée(s) rattachée(s).');
         }catch(error){status(error.message);}
       }));
       area.append(actions);
-      const registry=block('div',undefined,'account-block');
+      const registry=block('div',undefined,'account-block bro-account-registry');
       registry.append(block('h3','Comptes et paiements'),block('p','Les comptes enregistrés apparaissent dès leur prochaine connexion. Pour un paiement sans référence liée, vérifie le justificatif et l’identité Discord du client avant de le rattacher.','client-quiet'));
       const accounts=block('div');
       async function listRegistered(cursor){
