@@ -224,3 +224,22 @@ test('compatibility block attributes installation and Windows compatibility clai
 test('all homepage editorial cards including compatibility and setup have valid owner editing fields',()=>{const html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),js=readFileSync(new URL('../homepage-editor.js',import.meta.url),'utf8');for(const id of ['compat-heading','compat-1','compat-2','scope-heading'])assert.match(html,new RegExp('data-home-block="'+id+'"'));for(const id of ['compat-1','compat-2']){assert.equal(validHomePatch(id,{title:'Titre corrigé',text:'Texte corrigé',image:'/assets/test.webp'}),true);assert.equal(validHomePatch(id,{checkoutUrl:'https://example.com'}),false);}assert.equal(validHomePatch('scope-heading',{text:'Présentation'}),true);for(const [,id] of html.matchAll(/data-home-block="([^"]+)"/g))assert.ok(Object.hasOwn(HOME_FIELDS,id),id);assert.match(js,/offer-access\|compat\|offer-guide/);assert.doesNotMatch(html,/class="bro-compat-note"[^>]*data-home-block/);});
 
 test('offers missing editorial blocks are editable and old content endpoint is owner-only',()=>{const html=readFileSync(new URL('../offres.html',import.meta.url),'utf8'),api=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8'),app=readFileSync(new URL('../app.js',import.meta.url),'utf8');for(const id of ['offer-patchnote','offer-crumb','offer-checkout-help'])assert.match(html,new RegExp('data-home-block="'+id+'"'));for(let i=1;i<=3;i++)assert.equal(validHomePatch('offer-guide-'+i,{image:'/assets/test.webp'}),true);for(const [,id] of html.matchAll(/data-home-block="([^"]+)"/g))assert.ok(Object.hasOwn(HOME_FIELDS,id),id);assert.equal(validHomePatch('offer-checkout-help',{text:'Test\u0000'}),false);assert.equal(validHomePatch('offer-patchnote',{href:'https://example.com'}),false);assert.equal(validHomePatch('__proto__',{text:'test'}),false);assert.match(api,/path==='\/api\/site'\|\|path==='\/api\/media'\)\&\&req.method==='POST'\)\{\s*if\(!canEditHomepage\(user\)\)/);assert.match(app,/function editor\(\)\{\s*if\(!user\?\.homeEditor\)return/);assert.doesNotMatch(html,/data-home-block="(?:capability-disclaimer|purchase-guide-warning)"/);});
+
+test('purchase feed rebuilds old index and uses current consent, real Discord display name and avatar',async()=>{
+ const b=bucket();
+ const p=payment('pay_RECENT','2026-11-24T14:00:00Z','prod_xejMeqvQCPugc');
+ const avatar='https://cdn.discordapp.com/avatars/'+discordId+'/current.png';
+ b.objects['private/activity/receipts/'+p.id+'.json']={...normalizePayment(p,'life'),discordId};
+ b.objects['private/activity/recent-index-v1.json']={items:[]};
+ b.objects['private/bro-accounts/v1/'+discordId+'.json']={discordId,username:'bro-generated-12345',displayName:'BroReal#0',avatar};
+ b.objects['private/activity/consent/'+discordId+'.json']={showPublic:true};
+ let [row]=await recentPurchases(b);
+ assert.equal(row.name,'BroReal');assert.equal(row.avatar,avatar);assert.equal(row.planId,'life');
+ b.objects['private/activity/consent/'+discordId+'.json']={showPublic:false};
+ [row]=await recentPurchases(b);assert.equal(row.name,'Client BRO');assert.equal(row.avatar,null);
+});
+test('recent purchase names use customer and lifetime color styles',()=>{
+ const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ for(const cls of ['purchase-name-customer','purchase-name-lifetime']){assert.ok(js.includes(cls));assert.ok(css.includes(cls));}
+});
