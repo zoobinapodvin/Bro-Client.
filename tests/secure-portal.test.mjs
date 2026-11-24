@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {listPaidPurchases,accountOverview,assignKey,readCustomerKey,encryptCustomerKey,
- decryptCustomerKey,validUploadedExe,storeRelease,addStockKey,queuePaidKey,stockOverview,ownerStockPath,revealStockKey} from '../lib/fulfillment.mjs';
+ decryptCustomerKey,validUploadedExe,storeRelease,addStockKey,queuePaidKey,stockOverview,ownerStockPath,revealStockKey,importStockKeys} from '../lib/fulfillment.mjs';
 import {handleInteraction} from '../lib/discord.mjs';
 import {readFileSync} from 'node:fs';
 
@@ -143,4 +143,17 @@ test('owner-only stock reveal returns exactly the selected key, never another us
  assert.equal(added.status,'added');const view=await stockOverview(store);assert.equal(view.rows[0].id,added.id);assert.ok(!JSON.stringify(view).includes('TEST-REVEAL-01'));
  assert.equal(await revealStockKey(store,{discordId:admin},added.id),'TEST-REVEAL-01');assert.equal(await revealStockKey(store,{discordId:buyer,admin:true},added.id),null);assert.equal(await revealStockKey(store,null,added.id),null);
  const ui=readFileSync(new URL('../key-stock.js',import.meta.url),'utf8');assert.match(ui,/\/api\/admin\/key-stock/);assert.match(ui,/aria-busy/);
+});
+test('bulk import locks sold duplicates and unknown statuses, preserves category and is idempotent',async t=>{
+ const old=process.env.BRO_KEY_ENCRYPTION_KEY;process.env.BRO_KEY_ENCRYPTION_KEY='e'.repeat(64);t.after(()=>{if(old===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=old;});
+ const admin='1027596385123565569',store=bucket(ledger());
+ const rows=[{key:'TEST-DUPLICATE',status:'available'},{key:'TEST-DUPLICATE',status:'sold'},{key:'TEST-UNKNOWN',status:'quarantine'},{key:'TEST-FREE',status:'available'}];
+ assert.equal((await importStockKeys(store,{planId:'day',rows,operatorId:buyer})).status,'invalid');
+ const result=await importStockKeys(store,{planId:'day',rows,operatorId:admin});
+ assert.equal(result.added,3);assert.equal(result.duplicates,1);
+ assert.equal((await importStockKeys(store,{planId:'day',rows,operatorId:admin})).added,0);
+ assert.equal((await queuePaidKey(store,{discordId:buyer,paymentId:payment,planId:'day',expiresAt:future})).status,'assigned');
+ assert.equal(await readCustomerKey(store,buyer,payment),'TEST-FREE');
+ const overview=await stockOverview(store);assert.equal(overview.rows.filter(r=>r.status==='sold').length,1);assert.equal(overview.rows.filter(r=>r.status==='quarantine').length,1);assert.equal(overview.counts.day.available,0);
+ assert.ok(!JSON.stringify(store.data).includes('TEST-DUPLICATE'));
 });

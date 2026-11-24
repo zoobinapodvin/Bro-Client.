@@ -244,3 +244,25 @@ test('automatic recovery never links a receipt with no server order',async()=>{
  assert.equal([...b.map.keys()].filter(k=>k.startsWith('private/discord-entitlements/')).length,0);
 });
 
+
+test('all four configured plans create unique attributed checkouts and deliver only their matching stocked key',async t=>{
+ const names=['day','week','month','life'];const variants=['plan_2XsZR1EchcSOj','plan_sIer2uLNR0Idi','plan_jzDhXvlF2aSQc','plan_3G7GUcXlBFZJX'];const products=['prod_Qs0u7iy24c6j3','prod_dbz8E6hOyIiUP','prod_ly2WvPXYW1TfY','prod_WRQUxXTbiAwjD'];const prices=[6,15,35,100];
+ const vars=['BRO_KEY_ENCRYPTION_KEY','BRO_DISCORD_WEBHOOK_DAY','BRO_DISCORD_WEBHOOK_WEEK','BRO_DISCORD_WEBHOOK_MONTH','BRO_DISCORD_WEBHOOK_LIFETIME','BRO_DISCORD_WEBHOOK_PUBLIC_ACTIVITY','BRO_DISCORD_BOT_TOKEN'];const old=Object.fromEntries(vars.map(k=>[k,process.env[k]])),original=globalThis.fetch;
+ for(const k of vars)delete process.env[k];process.env.BRO_KEY_ENCRYPTION_KEY='f'.repeat(64);
+ t.after(()=>{globalThis.fetch=original;for(const [k,v] of Object.entries(old))if(v===undefined)delete process.env[k];else process.env[k]=v;});
+ const b=bucket(),secret='test-only-secret',env={BUCKET:b,WHOP_API_KEY:'test-only',WHOP_ACCOUNT_ID:company,WHOP_WEBHOOK_SECRET:secret},refs=new Set();
+ for(let i=0;i<names.length;i++){
+  const planId=names[i],discordId='157409690000000000'+(i+1),user={id:'test-user-'+i,discordId,discordUsername:'Test'},pid='pay_TESTPLAN'+i,cid='ch_TESTPLAN'+i,rawKey='TEST-LICENSE-'+planId;
+  assert.equal((await addStockKey(b,{planId,key:rawKey,operatorId:'1027596385123565569'})).status,'added');
+  let metadata;
+  globalThis.fetch=async(url,opts)=>{assert.match(String(url),/checkout_configurations$/);const request=JSON.parse(opts.body);assert.equal(request.variant_id,variants[i]);assert.equal(request.redirect_url,'https://www.broclient.com/#compte');metadata=request.metadata;return Response.json({id:cid,account_id:company,variant:{id:variants[i],currency:'eur',initial_price:prices[i]},purchase_url:'https://whop.com/checkout/'+cid});};
+  assert.equal(await createCheckout(env,user,{id:planId,name:planId,price:prices[i],checkoutUrl:'https://whop.com/checkout/'+variants[i]},'https://www.broclient.com'),'https://whop.com/checkout/'+cid);assert.ok(!refs.has(metadata.bro_order));refs.add(metadata.bro_order);
+  globalThis.fetch=async url=>{assert.match(String(url),/\/payments\//);return Response.json(payment({id:pid,metadata,variant_id:variants[i],product:{id:products[i]},paid_at:new Date().toISOString(),total:prices[i],checkout_configuration_id:cid,account_id:company}));};
+  const body=JSON.stringify({type:'payment.succeeded',account_id:company,data:{id:pid}}),stamp=String(Math.floor(Date.now()/1000)),id='webhook_test_'+i,sig=createHmac('sha256',secret).update(id+'.'+stamp+'.'+body).digest('base64');
+  const signed=()=>new Request('https://www.broclient.com/api/whop/webhook',{method:'POST',body,headers:{'webhook-timestamp':stamp,'webhook-id':id,'webhook-signature':'v1,'+sig}});
+  assert.equal((await handleBilling(signed(),env,null)).status,200);
+  assert.equal(await readCustomerKey(b,discordId,pid),rawKey);assert.equal(await readCustomerKey(b,'1574096900000000999',pid),null);
+  assert.equal((await handleBilling(signed(),env,null)).status,200);assert.equal((await stockOverview(b)).counts[planId].assigned,1);
+ }
+ assert.equal(refs.size,4);
+});
