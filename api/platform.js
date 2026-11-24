@@ -1,15 +1,20 @@
 import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
 import {session,exchange,startDiscord,clear,disconnectDiscord,destination} from '../lib/auth.mjs';
-import {createCheckout,handleBilling,hasConfirmedPurchase} from '../lib/billing.mjs';
+import {createCheckout,handleBilling,hasConfirmedPurchase,attachVerifiedPayment} from '../lib/billing.mjs';
 import {authenticatedCheckoutDestination} from '../lib/checkout.mjs';
+import {registerAccount,listAccounts,findAccount} from '../lib/accounts.mjs';
 import {botConfigured,reconcileMember,registerCommands,handleInteraction,reconcileExpiredRoles} from '../lib/discord.mjs';
 import {communityStats} from '../lib/community.mjs';
 import {accountOverview,hasActivePurchase,readCustomerKey,storeRelease,RELEASE_PATH} from '../lib/fulfillment.mjs';
 import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary} from '../lib/activity.mjs';
 import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
 import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
-const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET};
+// Profile persistence must never block authentication or the checkout route.
+async function rememberAccount(user){
+ try{return await registerAccount(bucket,user);}catch(error){console.error('Bro account registry unavailable',error?.name);return null;}
+}
+const billingEnv={BUCKET:bucket,WHOP_API_KEY:process.env.WHOP_API_KEY,WHOP_ACCOUNT_ID:process.env.WHOP_ACCOUNT_ID,WHOP_WEBHOOK_SECRET:process.env.WHOP_WEBHOOK_SECRET,WHOP_CHECKOUT_API_KEY:process.env.WHOP_CHECKOUT_API_KEY};
 async function body(req,max) {
   const chunks=[];let size=0;
   for await(const part of req){const buf=Buffer.from(part);size+=buf.length;if(size>max)throw new RangeError();chunks.push(buf);}
@@ -86,7 +91,7 @@ export default async function handler(req,res) {
       res.setHeader('Referrer-Policy','no-referrer');
       const code=parsed.searchParams.get('code');
       if(!code)return res.redirect(303,parsed.searchParams.has('error')?'/?connexion=interrompue#compte':'/#compte');
-      try{return await exchange(req,res,{code},true);}
+      try{return await exchange(req,res,{code},true,rememberAccount);}
       catch{return res.redirect(303,'/?connexion=indisponible#compte');}
     }
     if(path==='/auth/login'&&req.method==='GET'){
@@ -114,7 +119,7 @@ export default async function handler(req,res) {
     }
     if(path==='/auth/unlink'&&req.method==='POST')return disconnectDiscord(req,res);
     if(path==='/auth/discord'&&req.method==='POST')return startDiscord(res,new URLSearchParams(payload.toString()).get('return_to'));
-    if(path==='/auth/exchange'&&req.method==='POST')return await exchange(req,res,JSON.parse(payload.toString()));
+    if(path==='/auth/exchange'&&req.method==='POST')return await exchange(req,res,JSON.parse(payload.toString()),false,rememberAccount);
 
     if(/^\/media\/[a-f0-9-]{36}$/.test(path)&&req.method==='GET'){
       const img=await bucket.get(route);if(!img)return res.status(404).end();
@@ -137,11 +142,31 @@ export default async function handler(req,res) {
       const result=await editPatchnote(bucket,JSON.parse(payload.toString()));
       return res.status(result.status).json(result);
     }
-    if(path==='/api/me'&&req.method==='GET')return res.json({user:user?{
+    if(path==='/api/me'&&req.method==='GET'){
+      const account=user?await rememberAccount(user):null;
+      return res.json({user:user?{
+      username:account?.username??null,
       discordUsername:user.discordUsername,
       discordAvatar:user.discordAvatar,
       admin:user.admin,patchnotesAdmin:canEditPatchnotes(user),discordLinked:!!user.discordId
     }:null});
+    }
+    if(path==='/api/admin/accounts'&&req.method==='GET'){
+      if(!canEditPatchnotes(user))return res.status(403).end();
+      return res.json(await listAccounts(bucket,parsed.searchParams.get('cursor')));
+    }
+    if(path==='/api/admin/payments/attach'&&req.method==='POST'){
+      if(!canEditPatchnotes(user))return res.status(403).end();
+      // This is a staff-only reconciliation, never an automatic claim by payment ID.
+      const input=JSON.parse(payload.toString());
+      if(input?.confirmed!==true||typeof input.paymentId!=='string'||typeof input.account!=='string')return res.status(422).json({error:'Confirme la vérification du justificatif et du compte Discord.'});
+      const account=await findAccount(bucket,input.account);
+      if(!account)return res.status(404).json({error:'Compte introuvable. Le client doit se reconnecter à Bro Client.'});
+      try{
+        const result=await attachVerifiedPayment(billingEnv,account,input.paymentId,user.discordId);
+        return res.status(result.status==='linked'?200:409).json(result);
+      }catch(error){console.error('Bro payment reconciliation failed',error?.name);return res.status(503).json({error:'Impossible de vérifier le paiement auprès de Whop.'});}
+    }
     if(path==='/api/admin/notifications/replay-today'&&req.method==='POST'){
       if(!canEditPatchnotes(user))return res.status(403).json({error:'Accès réservé au propriétaire Discord.'});
       if(!billingEnv.WHOP_API_KEY||!billingEnv.WHOP_ACCOUNT_ID)

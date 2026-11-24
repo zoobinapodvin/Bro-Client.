@@ -133,6 +133,7 @@ async function account(){
   }
   const identity=block('div',undefined,'portal-identity');
   identity.append(block('small','CONNECTÉ AVEC DISCORD'),block('strong',user.discordUsername||'Compte Discord'));
+  if(user.username)identity.append(block('small','Identifiant : '+user.username));
   profile.append(identity,block('span','Connecté','portal-connected'));
   body.append(profile);
 
@@ -322,6 +323,38 @@ async function account(){
         }catch(error){status(error.message);}
       }));
       area.append(actions);
+      const registry=block('div',undefined,'account-block');
+      registry.append(block('h3','Comptes et paiements'),block('p','Les comptes enregistrés apparaissent dès leur prochaine connexion. Pour un paiement sans référence liée, vérifie le justificatif et l’identité Discord du client avant de le rattacher.','client-quiet'));
+      const accounts=block('div');
+      async function listRegistered(cursor){
+        try{
+          const r=await fetch('/api/admin/accounts'+(cursor?'?cursor='+encodeURIComponent(cursor):''),{cache:'no-store'});
+          if(!r.ok)throw Error();
+          const data=await r.json();accounts.replaceChildren();
+          if(!data.accounts.length)accounts.append(block('p','Aucun compte enregistré sur cette page.'));
+          for(const account of data.accounts){
+            const line=block('p',account.username+' · '+account.displayName+' · '+account.discordId,'client-quiet');
+            accounts.append(line);
+          }
+          if(data.nextCursor)accounts.append(smallButton('Page suivante',()=>listRegistered(data.nextCursor)));
+        }catch{accounts.textContent='Registre momentanément indisponible.';}
+      }
+      registry.append(smallButton('Afficher les comptes',()=>listRegistered()),accounts);
+      const form=block('form');const accountField=block('input');accountField.placeholder='Identifiant BRO ou ID Discord';accountField.required=true;accountField.setAttribute('aria-label','Identifiant BRO ou ID Discord');
+      const paymentField=block('input');paymentField.placeholder='Référence Whop pay_…';paymentField.required=true;paymentField.setAttribute('aria-label','Référence du paiement Whop');
+      const verified=block('input');verified.type='checkbox';verified.required=true;const label=block('label');label.append(verified,document.createTextNode(' J’ai vérifié le justificatif et le compte Discord du client.'));
+      const submit=block('button','Rattacher le paiement','btn ghost');submit.type='submit';
+      form.append(accountField,paymentField,label,submit);
+      form.onsubmit=async e=>{
+        e.preventDefault();submit.disabled=true;
+        try{
+          const res=await fetch('/api/admin/payments/attach',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:accountField.value.trim(),paymentId:paymentField.value.trim(),confirmed:verified.checked})});
+          const result=await res.json();if(!res.ok)throw Error(result.error||'Rattachement refusé.');
+          status('Paiement rattaché : '+result.username+' · '+result.plan+(result.active?'':' (pass expiré)'));form.reset();
+        }catch(error){status(error.message||'Rattachement indisponible.');}
+        finally{submit.disabled=false;}
+      };
+      registry.append(form);area.append(registry);
       const upload=block('input');upload.type='file';upload.accept='.exe,application/octet-stream';
       upload.setAttribute('aria-label','Importer le programme autorisé');
       area.append(upload);

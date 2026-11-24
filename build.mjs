@@ -1,9 +1,9 @@
 import {spawnSync} from 'node:child_process';
-for(const script of ['app.js','api/platform.js','lib/fulfillment.mjs','lib/discord.mjs','lib/purchase-notify.mjs','lib/patchnotes.mjs','patchnotes.js','lib/activity.mjs','lib/checkout.mjs']){
+for(const script of ['app.js','api/platform.js','lib/fulfillment.mjs','lib/discord.mjs','lib/purchase-notify.mjs','lib/patchnotes.mjs','patchnotes.js','lib/activity.mjs','lib/checkout.mjs','lib/accounts.mjs']){
   const check=spawnSync(process.execPath,['--check',script],{stdio:'inherit'});
   if(check.status!==0)throw Error('JavaScript syntax check failed: '+script);
 }
-const checks=spawnSync(process.execPath,['--test','tests/bro-checkout-roles.test.mjs','tests/discord-oauth-route.test.mjs','tests/secure-portal.test.mjs','tests/activity-ui.test.mjs','tests/checkout-guest.test.mjs','tests/purchase-feed.test.mjs','tests/patchnotes-notify.test.mjs'],{stdio:'inherit'});
+const checks=spawnSync(process.execPath,['--test','tests/bro-checkout-roles.test.mjs','tests/discord-oauth-route.test.mjs','tests/secure-portal.test.mjs','tests/activity-ui.test.mjs','tests/checkout-guest.test.mjs','tests/purchase-feed.test.mjs','tests/patchnotes-notify.test.mjs','tests/accounts.test.mjs'],{stdio:'inherit'});
 if(checks.status!==0)throw Error('Bro Client checks failed. Deployment stopped.');
 import {cp,mkdir} from 'node:fs/promises';
 await mkdir('dist',{recursive:true});
