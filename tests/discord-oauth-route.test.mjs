@@ -31,7 +31,7 @@ test('GET /auth/discord directly begins PKCE without a 403/404',async()=>{
  assert.equal(oauth.pathname,'/auth/v1/authorize');
  assert.equal(oauth.searchParams.get('provider'),'discord');
  assert.equal(oauth.searchParams.get('code_challenge_method'),'s256');
- assert.equal(oauth.searchParams.get('redirect_to'),'https://www.broclient.com/connexion.html');
+ assert.equal(oauth.searchParams.get('redirect_to'),'https://www.broclient.com/auth/discord-return');
  assert.ok(oauth.searchParams.get('code_challenge')?.length>=43);
  const cookies=result.headers.get('set-cookie')||[];
  assert.ok(cookies.some(s=>s.startsWith('__Host-bro-discord-proof=')&&s.includes('HttpOnly')&&s.includes('Secure')));

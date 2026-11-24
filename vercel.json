@@ -3,7 +3,13 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/connexion.html",
+      "source": "/",
+      "has": [
+        {
+          "type": "query",
+          "key": "code"
+        }
+      ],
       "destination": "/api/platform?route=auth/discord-return"
     },
     {
