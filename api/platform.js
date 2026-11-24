@@ -317,23 +317,39 @@ export default async function handler(req,res) {
       return await respond(res,path==='/api/site'?await saveSite(request,bucket):await upload(request,bucket));
     }
     if(/^\/checkout\/(day|week|month|life)$/.test(path)&&req.method==='GET'){
-      if(process.env.BRO_KEY_DELIVERY_PAUSED==='true')return res.redirect(302,'/offres');
-      
-      const {site:config}=await site();const plan=config.plans.find(p=>path==='/checkout/'+p.id);
-      if(!plan?.checkoutUrl)return res.redirect(302,'/offres');
-      // Require the verified Discord session before any Whop redirect.
-      // A direct fallback cannot automatically grant account entitlements.
-      if(!user?.discordId)return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent(path));
-      try{validWhopPlan(plan.checkoutUrl);}catch{return res.redirect(302,'/offres');}
+      const planId=path.split('/').pop();
+      if(!user?.discordId||!/^\d{17,20}$/.test(user.discordId))
+        return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent(path));
       try{
-        // Preferred: per-session Whop checkout with a server-stored random
-        // order ref in metadata, so the signed webhook can identify Discord.
-        const result=await authenticatedCheckoutDestination(billingEnv,user,plan,'https://www.broclient.com',createCheckout);
-        return res.redirect(302,result.url);
-      }catch(error){
-        console.error('Bro checkout attribution unavailable',{
-          plan:plan.id,reason:String(error?.message||'unknown').slice(0,90)
+        const packageId={day:'7832046',week:'7832045',month:'7832044',life:'7832042'}[planId];
+        const token=process.env.TEBEX_PUBLIC_TOKEN;
+        if(!token||!process.env.TEBEX_WEBHOOK_SECRET)throw Error('tebex_not_configured');
+        const ref=crypto.randomUUID();
+        const api='https://headless.tebex.io/api';
+        const call=async (path,body)=>{
+          const r=await fetch(api+path,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(8000)});
+          if(!r.ok)throw Error('tebex_http_'+r.status);
+          const result=await r.json();
+          return result.data??result;
+        };
+        const basket=await call('/accounts/'+encodeURIComponent(token)+'/baskets',{
+          complete_url:'https://www.broclient.com/#compte',
+          cancel_url:'https://www.broclient.com/offres',
+          complete_auto_redirect:true,
+          custom:{bro_order:ref}
         });
+        if(typeof basket.ident!=='string'||!/^[A-Za-z0-9-]{10,128}$/.test(basket.ident))throw Error('tebex_basket_invalid');
+        const filled=await call('/baskets/'+encodeURIComponent(basket.ident)+'/packages',{package_id:packageId,quantity:1});
+        if(filled.ident!==basket.ident||filled.complete===true)throw Error('tebex_basket_mismatch');
+        const target=new URL(filled.links?.checkout??'');
+        if(target.protocol!=='https:'||!['checkout.tebex.io','pay.tebex.io'].includes(target.hostname)||target.username||target.password||target.port)throw Error('tebex_checkout_invalid');
+        const order={provider:'tebex',planId,packageId,basketId:basket.ident,discordId:user.discordId,owner:createHash('sha256').update(String(user.id)).digest('hex'),createdAt:new Date().toISOString()};
+        const saved=await bucket.put('private/tebex/orders/'+ref+'.json',JSON.stringify(order),{onlyIf:{etagDoesNotMatch:'*'}});
+        if(!saved)throw Error('tebex_order_not_saved');
+        res.setHeader('Referrer-Policy','no-referrer');
+        return res.redirect(303,target.href);
+      }catch(error){
+        console.error('Tebex checkout unavailable',{plan:planId,reason:String(error?.message||'unknown').slice(0,80)});
         return res.redirect(303,'/offres?paiement=indisponible');
       }
     }
