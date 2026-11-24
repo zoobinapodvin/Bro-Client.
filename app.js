@@ -53,6 +53,7 @@ function render(){
   if($('.art')) $('.art').style.backgroundImage=asset(c.heroImage) ? 'url('+JSON.stringify(asset(c.heroImage))+')' : 'none';
   $('#plans')?.replaceChildren(...site.plans.map(plan=>{
     const card=block('article',undefined,'plan '+plan.id);
+    card.dataset.homeBlock='offer-plan-'+plan.id;card.dataset.homeLabel='Offre · '+plan.name;
     const row=block('div',undefined,'plan-top');
     row.setAttribute('aria-hidden','true');
     // Reuse the configured Rob Run artwork without another network asset.
@@ -61,9 +62,10 @@ function render(){
     row.append(block('span','BRO.','pass-mark'),block('span',plan.duration,'pass-duration'));
     const price=block('div',undefined,'amount');
     price.append(block('strong',new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(plan.price)+' €'),block('small','paiement unique'));
-    card.append(row,block('h3',plan.name),block('p',plan.description),price,button(c.planButton,()=>checkout(plan),'btn plan-button')); return card;
+    const title=block('h3',plan.name),desc=block('p',plan.description),cta=button(c.planButton,()=>checkout(plan),'btn plan-button');title.dataset.homeField='title';desc.dataset.homeField='text';cta.dataset.homeField='cta';
+    card.append(row,title,desc,price,cta); return card;
   }));
-  $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');const title=block('summary',c['q'+i]),text=block('p',c['a'+i]);title.dataset.homeField='title';text.dataset.homeField='text';el.append(title,text);if(document.querySelector('[data-home-block="faq-heading"]')){const wrap=block('div',undefined,'home-faq-item');wrap.dataset.homeBlock='faq-'+i;wrap.dataset.homeLabel='Question '+i;wrap.append(el);return wrap;}return el;}));
+  $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');const title=block('summary',c['q'+i]),text=block('p',c['a'+i]);title.dataset.homeField='title';text.dataset.homeField='text';el.append(title,text);if(document.querySelector('[data-home-block="faq-heading"],[data-home-block="offer-faq-heading"]')){const wrap=block('div',undefined,'home-faq-item');wrap.dataset.homeBlock=(document.querySelector('.offers')?'offer-faq-':'faq-')+i;wrap.dataset.homeLabel='Question '+i;wrap.append(el);return wrap;}return el;}));
   window.dispatchEvent(new Event('bro-home-render'));
 }
 function openDialog(title) {
