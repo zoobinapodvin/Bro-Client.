@@ -64,10 +64,7 @@ function render(){
     price.append(block('strong',new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(plan.price)+' €'),block('small','paiement unique'));
     const title=block('h3',plan.name),desc=block('p',plan.description),cta=link(c.planButton,'/checkout/'+plan.id,'btn plan-button');title.dataset.homeField='title';desc.dataset.homeField='text';cta.dataset.homeField='cta';
     cta.href='/checkout/'+plan.id+'?feed=public';
-    const privacy=block('p','Après paiement confirmé, ton nom d’affichage et ta photo Discord peuvent figurer dans les derniers achats publics. ','client-quiet');
-    const anonymous=link('Acheter anonymement','/checkout/'+plan.id+'?feed=private');
-    anonymous.style.textDecoration='underline';privacy.append(anonymous);
-    card.append(row,title,desc,price,cta,privacy); return card;
+    card.append(row,title,desc,price,cta); return card;
   }));
   $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');const title=block('summary',c['q'+i]),text=block('p',c['a'+i]);title.dataset.homeField='title';text.dataset.homeField='text';el.append(title,text);if(document.querySelector('[data-home-block="faq-heading"],[data-home-block="offer-faq-heading"]')){const wrap=block('div',undefined,'home-faq-item');wrap.dataset.homeBlock=(document.querySelector('.offers')?'offer-faq-':'faq-')+i;wrap.dataset.homeLabel='Question '+i;wrap.append(el);return wrap;}return el;}));
   window.dispatchEvent(new Event('bro-home-render'));

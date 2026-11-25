@@ -295,5 +295,10 @@ test('new disclosed Tebex purchases display automatically, legacy and private pu
  await setActivityPreference(b,{discordId,discordUsername:'RealDiscord',discordAvatar:avatar},true);
  rows=await recentPurchases(b);assert.deepEqual(rows.map(r=>r.name),['Client BRO','RealDiscord','RealDiscord']);
  const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
- assert.ok(js.includes("'?feed=public'"));assert.ok(js.includes("'?feed=private'"));
+ assert.ok(js.includes("'?feed=public'"));
+ assert.ok(js.includes("card.append(row,title,desc,price,cta); return card;"));
+ assert.doesNotMatch(js,/Acheter anonymement|Après paiement confirmé, ton nom d’affichage/);
+ assert.ok(js.includes("profileVisibilitySetting"));
+ const api=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
+ assert.ok(api.includes("feedParam==='public'||feedParam==='private'"));
 });
