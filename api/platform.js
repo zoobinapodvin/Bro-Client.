@@ -1,4 +1,5 @@
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
+import {isIP} from 'node:net';
 import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
 import {canEditHomepage,readHomepage,saveHomepage} from '../lib/homepage.mjs';
@@ -338,11 +339,14 @@ export default async function handler(req,res) {
         const api='https://headless.tebex.io/api';
         const account='/accounts/'+encodeURIComponent(token);
         const owner=createHash('sha256').update(String(user.id)).digest('hex');
-        const call=async (path,body)=>{
-          const r=await fetch(api+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','Accept':'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(8000)});
+        const call=async (path,body,authorization)=>{
+          const headers={'Content-Type':'application/json','Accept':'application/json'};
+          if(authorization)headers.Authorization=authorization;
+          const r=await fetch(api+path,{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(8000)});
           const result=await r.json().catch(()=>({}));
           if(!r.ok){
             const error=Error('tebex_http_'+r.status);
+            error.status=r.status;
             error.loginRequired=r.status===422&&/user must login|login before|log in before|authentication required/i.test(JSON.stringify({message:result.message,detail:result.detail,errors:result.errors,title:result.title}));
             throw error;
           }
@@ -366,12 +370,38 @@ export default async function handler(req,res) {
           if(basket.ident!==order.basketId||basket.complete===true)throw Error('tebex_basket_mismatch');
         }else{
           ref=crypto.randomUUID();orderKey='private/tebex/orders/'+ref+'.json';
-          basket=await call(account+'/baskets',{
+          const basketData={
             complete_url:'https://www.broclient.com/#compte',
             cancel_url:'https://www.broclient.com/offres',
             complete_auto_redirect:true,
             custom:{bro_order:ref}
-          });
+          };
+          // The Headless API otherwise geolocates the server creating the basket.
+          // Use only Vercel's platform-controlled header, never a client-supplied country or IP.
+          const forwarded=req.headers['x-vercel-forwarded-for'];
+          let ip=typeof forwarded==='string'?forwarded.trim():'';
+          if(ip.toLowerCase().startsWith('::ffff:')&&isIP(ip.slice(7))===4)ip=ip.slice(7);
+          const privateKey=process.env.TEBEX_PRIVATE_KEY?.trim();
+          if(process.env.VERCEL==='1'&&privateKey&&isIP(ip)){
+            const authorization='Basic '+Buffer.from(token+':'+privateKey,'utf8').toString('base64');
+            try{
+              basket=await call(account+'/baskets?'+new URLSearchParams({ip_address:ip}),basketData,authorization);
+            }catch(error){
+              // Keep the existing checkout available if the provider explicitly rejects
+              // the optional IP/authentication. Never retry ambiguous network failures.
+              if(![400,401,403,422].includes(error.status))throw error;
+              console.warn('Tebex IP forwarding rejected',{plan:planId,status:error.status,ipVersion:isIP(ip)});
+              basket=await call(account+'/baskets',basketData);
+            }
+          }else{
+            console.warn('Tebex IP forwarding unavailable',{plan:planId});
+            basket=await call(account+'/baskets',basketData);
+          }
+          // Compare country codes for diagnostics only. GeoIP is not a billing address.
+          const edgeCountry=String(req.headers['x-vercel-ip-country']??'').toUpperCase();
+          const basketCountry=String(basket.country??'').toUpperCase();
+          if(/^[A-Z]{2}$/.test(edgeCountry)&&/^[A-Z]{2}$/.test(basketCountry)&&edgeCountry!==basketCountry)
+            console.warn('Tebex basket country differs from Vercel',{plan:planId,edgeCountry,basketCountry});
           if(typeof basket.ident!=='string'||!/^[A-Za-z0-9-]{10,128}$/.test(basket.ident))throw Error('tebex_basket_invalid');
           order={provider:'tebex',planId,packageId,basketId:basket.ident,discordId:user.discordId,owner,feedVisibility,identity:{username:user.discordUsername??null,avatar:user.discordAvatar??null},createdAt:new Date().toISOString()};
           if(!await bucket.put(orderKey,JSON.stringify(order),{onlyIf:{etagDoesNotMatch:'*'}}))throw Error('tebex_order_not_saved');
