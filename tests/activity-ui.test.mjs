@@ -259,3 +259,20 @@ test('legacy checkout assistance remains hidden with the Tebex checkout',async()
  context.user={discordLinked:true};context.syncGuideNavigation();assert.equal(note.hidden,true);
  context.user=null;context.syncGuideNavigation();assert.equal(note.hidden,true);
 });
+
+
+test('Tebex purchases show the real Discord profile on explicit opt-in and respect opt-out',async()=>{
+ const b=bucket();
+ const avatar='https://cdn.discordapp.com/avatars/'+discordId+'/profile.png';
+ await storeActivity(b,{paymentId:'pay_tebex123',provider:'tebex',transactionId:'tbx-example',planId:'week',plan:'Pass Semaine',date:'2026-11-25T00:04:00Z',amount:15,currency:'EUR',discordId,name:'Client BRO',avatar:null,publicIdentity:false});
+ assert.equal((await recentPurchases(b))[0].name,'Client BRO');
+ await setActivityPreference(b,{discordId,username:'internal-bro-handle',discordUsername:'RealDiscord',discordAvatar:avatar},true);
+ let [row]=await recentPurchases(b);
+ assert.equal(row.name,'RealDiscord');assert.equal(row.avatar,avatar);
+ assert.equal(row.transactionId,undefined);assert.equal(row.discordId,undefined);
+ await setActivityPreference(b,{discordId},false);
+ [row]=await recentPurchases(b);assert.equal(row.name,'Client BRO');assert.equal(row.avatar,null);
+ const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.ok(js.includes("viewport.append(profileVisibilitySetting());\n      viewport.append(smallButton('Actualiser mes accès'"));
+ assert.ok(js.includes("if(document.querySelector('#purchaseBoard'))refreshRecentBoard();"));
+});

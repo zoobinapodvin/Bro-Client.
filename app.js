@@ -204,14 +204,14 @@ async function account(){
   function profileVisibilitySetting(){
     const panel=block('div',undefined,'portal-visibility-setting');
     panel.append(block('strong','Visibilité de mes achats','portal-visibility-title'));
-    panel.append(block('p','Ton pseudo et ton avatar Discord sont affichés uniquement si ton paiement est associé de manière vérifiée à ton compte. Cette option est facultative.','portal-visibility-help'));
+    panel.append(block('p','Affiche ton pseudo et ta photo Discord dans les derniers achats de la page d’accueil. Cette option est facultative, tu peux la désactiver à tout moment.','portal-visibility-help'));
     const choice=block('label',undefined,'portal-consent-label');
-    const checkbox=block('input');checkbox.type='checkbox';
-    choice.append(checkbox,block('span','Afficher mon profil Discord sur les achats associés'));
+    const checkbox=block('input');checkbox.type='checkbox';checkbox.disabled=true;
+    choice.append(checkbox,block('span','Afficher mon profil Discord dans les derniers achats'));
     panel.append(choice);
     fetch('/api/account/publicity',{cache:'no-store'})
       .then(response=>{if(!response.ok)throw Error();return response.json();})
-      .then(data=>{if(panel.isConnected)checkbox.checked=data.showPublic===true;})
+      .then(data=>{if(panel.isConnected){checkbox.checked=data.showPublic===true;checkbox.disabled=false;}})
       .catch(()=>{if(panel.isConnected)checkbox.disabled=true;});
     checkbox.onchange=async()=>{
       const checked=checkbox.checked;checkbox.disabled=true;
@@ -222,6 +222,7 @@ async function account(){
         });
         if(!response.ok)throw Error();
         status(checked?'Profil visible pour tes achats vérifiés et associés.':'Tes achats resteront anonymes sur le site.');
+        if(document.querySelector('#purchaseBoard'))refreshRecentBoard();
       }catch{
         checkbox.checked=!checked;status('Impossible de modifier la visibilité pour le moment.');
       }finally{checkbox.disabled=false;}
@@ -271,6 +272,7 @@ async function account(){
         const old=block('div',undefined,'portal-key-row');old.append(block('strong','Clé historique'));
         old.append(smallButton('Afficher',async()=>{try{const r=await fetch('/api/account/key?payment=legacy',{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();old.append(block('p',d.key));}catch{status('Clé indisponible.');}}),link('.txt','/api/account/key.txt?payment=legacy','btn ghost portal-action'));viewport.append(old);
       }
+      viewport.append(profileVisibilitySetting());
       viewport.append(smallButton('Actualiser mes accès',()=>refresh(true)));
       viewport.append(smallButton('Synchroniser mon rôle',async()=>{
         status('Synchronisation des rôles…');
