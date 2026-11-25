@@ -58,8 +58,15 @@ export default async function handler(req,res) {
       const event=JSON.parse(raw.toString('utf8'));
       if(event?.type==='validation.webhook'&&typeof event.id==='string'&&event.id.length>0&&event.id.length<=200)
         return res.status(200).json({id:event.id});
-      const result=await completeTebexPayment(bucket,event);
-      return res.status(result.status).json(result.body);
+      try{
+        const result=await completeTebexPayment(bucket,event);
+        if(result.status>=400)console.error('Tebex webhook processing rejected',{type:event.type,status:result.status,reason:result.body.error});
+        return res.status(result.status).json(result.body);
+      }catch(error){
+        const frame=String(error?.stack??'').split('\n').find(l=>/\/lib\/(tebex|storage|fulfillment|activity|purchase-notify|discord)\.mjs:\d+:\d+/.test(l));
+        console.error('Tebex webhook processing exception',{name:error?.name,code:typeof error?.code==='string'?error.code.replace(/[^A-Z0-9_]/g,'').slice(0,60):null,frame:frame?.match(/\/lib\/[a-z-]+\.mjs:\d+:\d+/)?.[0]??null});
+        return res.status(503).json({error:'processing_pending'});
+      }
     }
     if(path==='/api/ops/reconcile-sales'&&req.method==='POST'){
       const token=process.env.BRO_SALES_RECONCILE_TOKEN;
