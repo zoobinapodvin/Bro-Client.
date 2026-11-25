@@ -44,4 +44,16 @@ test('Tebex rejects unrelated products and verifies the completed basket transac
  const response={ident:o.basketId,complete:true,custom:{bro_order:ref},links:{payment:'https://checkout.tebex.io/api/payments/'+tx},packages:[{id:Number(plans.day),qty:1}],total_price:6,currency:'EUR'};
  globalThis.fetch=async()=>Response.json({data:response});assert.equal((await verifyTebexBasket(o,tx,ref)).complete,true);
  await assert.rejects(verifyTebexBasket(o,'tbx-other-transaction',ref),/mismatch/);
+ // Actual completed Headless baskets omit the payment link and expose quantity
+ // in in_basket. The signed event remains mandatory at the caller.
+ globalThis.fetch=async()=>Response.json({data:{...response,links:{checkout:'https://pay.tebex.io/test-basket-123'},packages:[{id:Number(plans.day),in_basket:{quantity:1}}]}});
+ assert.equal((await verifyTebexBasket(o,tx,ref)).complete,true);
+ await assert.rejects(verifyTebexBasket(o,tx,'different-reference'),/not_confirmed/);
+ globalThis.fetch=async()=>Response.json({data:{...response,complete:false,links:{},packages:[{id:Number(plans.day),in_basket:{quantity:1}}]}});
+ await assert.rejects(verifyTebexBasket(o,tx,ref),/not_confirmed/);
+ globalThis.fetch=async()=>Response.json({data:{...response,links:{},packages:[{id:Number(plans.week),in_basket:{quantity:1}}]}});
+ await assert.rejects(verifyTebexBasket(o,tx,ref),/products_mismatch/);
+ globalThis.fetch=async()=>Response.json({data:{...response,links:{},packages:[{id:Number(plans.day),in_basket:{quantity:2}}]}});
+ await assert.rejects(verifyTebexBasket(o,tx,ref),/products_mismatch/);
+
 });
