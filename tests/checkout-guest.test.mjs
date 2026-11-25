@@ -91,22 +91,24 @@ test('Tebex checkout uses catalog ident, supports required authentication and pr
  assert.ok(start>=0&&end>start);
  const {runInNewContext}=await import('node:vm');
  const {createHash,randomUUID}=await import('node:crypto');
+ const {isIP}=await import('node:net');
  const mapping={day:'7832046',week:'7832045',month:'7832044',life:'7832042'};
  const checkout='https://checkout.tebex.io/checkout/test-basket-123';
  const verified={id:'verified-user',discordId:'1574096900000000001'};
- const run=async(plan,user,{auth=false,callback=null,records=new Map(),target=checkout,feed=null}={})=>{
+ const run=async(plan,user,{auth=false,callback=null,records=new Map(),target=checkout,feed=null,ip='81.65.2.3',rejectIP=false,privateKey='test-private-key',country='FR'}={})=>{
   const calls=[],redirects=[];
-  const context={path:'/checkout/'+plan,parsed:{searchParams:new URLSearchParams(callback?'tebex_order='+callback:feed?'feed='+feed:'')},req:{method:'GET'},user,process:{env:{TEBEX_PUBLIC_TOKEN:'test-token',TEBEX_WEBHOOK_SECRET:'test-secret'}},crypto:{randomUUID},createHash,URL,AbortSignal,
-    console:{error(){}},bucket:{get:async k=>records.has(k)?{json:async()=>records.get(k)}:null,put:async(k,v,o)=>{if(records.has(k))return null;records.set(k,JSON.parse(v));return {etag:'saved'};}},
+  const context={path:'/checkout/'+plan,parsed:{searchParams:new URLSearchParams(callback?'tebex_order='+callback:feed?'feed='+feed:'')},req:{method:'GET',headers:{'x-vercel-forwarded-for':ip,'x-vercel-ip-country':'FR'}},user,process:{env:{VERCEL:'1',TEBEX_PUBLIC_TOKEN:'test-token',TEBEX_WEBHOOK_SECRET:'test-secret',TEBEX_PRIVATE_KEY:privateKey}},crypto:{randomUUID},createHash,URL,URLSearchParams,AbortSignal,Buffer,isIP,
+    console:{error(){},warn(){}},bucket:{get:async k=>records.has(k)?{json:async()=>records.get(k)}:null,put:async(k,v,o)=>{if(records.has(k))return null;records.set(k,JSON.parse(v));return {etag:'saved'};}},
     fetch:async(url,opts)=>{
-      calls.push({url,body:opts.body?JSON.parse(opts.body):null});
+      calls.push({url,body:opts.body?JSON.parse(opts.body):null,authorization:opts.headers.Authorization});
+      if(rejectIP&&new URL(url).searchParams.has('ip_address'))return {ok:false,status:422,json:async()=>({detail:'Invalid IP address'})};
       if(url.includes('/auth?'))return {ok:true,json:async()=>[{name:'Tebex',url:'https://ident.tebex.io/login'}]};
       if(url.includes('/accounts/')&&url.endsWith('/packages/'+mapping[plan]))return {ok:true,json:async()=>({data:{id:Number(mapping[plan]),ident:'catalog-'+mapping[plan]}})};
       if(url.endsWith('/packages')){
        if(auth&&!callback)return {ok:false,status:422,json:async()=>({detail:'User must login before adding packages to basket'})};
        return {ok:true,json:async()=>({ident:'test-basket-123',complete:false,links:{checkout:target}})};
       }
-      return {ok:true,json:async()=>({data:{ident:'test-basket-123',packages:[],complete:false}})};
+      return {ok:true,json:async()=>({data:{ident:'test-basket-123',packages:[],complete:false,country}})};
     },
     res:{setHeader(){},redirect:(status,url)=>{redirects.push({status,url});return url;}}};
   await runInNewContext('(async()=>{'+src.slice(start,end)+'})()',context);
@@ -115,6 +117,9 @@ test('Tebex checkout uses catalog ident, supports required authentication and pr
  for(const [plan,packageId] of Object.entries(mapping)){
   const r=await run(plan,verified);
   assert.equal(r.calls.length,3);
+  assert.equal(new URL(r.calls[0].url).searchParams.get('ip_address'),'81.65.2.3');
+  assert.equal(r.calls[0].authorization,'Basic '+Buffer.from('test-token:test-private-key').toString('base64'));
+  assert.ok(r.calls.slice(1).every(c=>!c.authorization));
   assert.equal(r.calls[2].body.package_id,'catalog-'+packageId);
   assert.equal(r.calls[2].body.quantity,1);
   const [[key,order]]=[...r.records];
@@ -124,6 +129,26 @@ test('Tebex checkout uses catalog ident, supports required authentication and pr
   assert.ok(key.includes(r.calls[0].body.custom.bro_order));
   assert.equal(r.redirects[0].url,checkout);
  }
+ const ipv6=await run('day',verified,{ip:'2001:db8::1'});
+ assert.equal(new URL(ipv6.calls[0].url).searchParams.get('ip_address'),'2001:db8::1');
+ assert.equal(ipv6.redirects[0].url,checkout);
+ const mapped=await run('day',verified,{ip:'::ffff:81.65.2.3'});
+ assert.equal(new URL(mapped.calls[0].url).searchParams.get('ip_address'),'81.65.2.3');
+ for(const opts of [{ip:'bad-value'},{privateKey:''}]){
+  const r=await run('day',verified,opts);
+  assert.equal(r.calls.length,3);
+  assert.equal(new URL(r.calls[0].url).searchParams.has('ip_address'),false);
+  assert.equal(r.calls[0].authorization,undefined);
+  assert.equal(r.redirects[0].url,checkout);
+ }
+ const rejected=await run('day',verified,{rejectIP:true});
+ assert.equal(rejected.calls.length,4);
+ assert.equal(new URL(rejected.calls[0].url).searchParams.get('ip_address'),'81.65.2.3');
+ assert.equal(new URL(rejected.calls[1].url).searchParams.has('ip_address'),false);
+ assert.equal(rejected.calls[1].authorization,undefined);
+ assert.deepEqual(rejected.calls[0].body,rejected.calls[1].body);
+ assert.equal(rejected.redirects[0].url,checkout);
+ assert.equal(rejected.records.size,1);
  const guestPublic=await run('day',null,{feed:'public'});
  assert.equal(new URL(guestPublic.redirects[0].url,'https://www.broclient.com').searchParams.get('return_to'),'/checkout/day?feed=public');
  const initial=await run('day',{...verified,discordUsername:'Verified#0',discordAvatar:'https://cdn.discordapp.com/embed/avatars/0.png'},{auth:true,feed:'public'});
