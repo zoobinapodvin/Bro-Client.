@@ -94,9 +94,9 @@ test('Tebex checkout uses catalog ident, supports required authentication and pr
  const mapping={day:'7832046',week:'7832045',month:'7832044',life:'7832042'};
  const checkout='https://checkout.tebex.io/checkout/test-basket-123';
  const verified={id:'verified-user',discordId:'1574096900000000001'};
- const run=async(plan,user,{auth=false,callback=null,records=new Map(),target=checkout}={})=>{
+ const run=async(plan,user,{auth=false,callback=null,records=new Map(),target=checkout,feed=null}={})=>{
   const calls=[],redirects=[];
-  const context={path:'/checkout/'+plan,parsed:{searchParams:new URLSearchParams(callback?'tebex_order='+callback:'')},req:{method:'GET'},user,process:{env:{TEBEX_PUBLIC_TOKEN:'test-token',TEBEX_WEBHOOK_SECRET:'test-secret'}},crypto:{randomUUID},createHash,URL,AbortSignal,
+  const context={path:'/checkout/'+plan,parsed:{searchParams:new URLSearchParams(callback?'tebex_order='+callback:feed?'feed='+feed:'')},req:{method:'GET'},user,process:{env:{TEBEX_PUBLIC_TOKEN:'test-token',TEBEX_WEBHOOK_SECRET:'test-secret'}},crypto:{randomUUID},createHash,URL,AbortSignal,
     console:{error(){}},bucket:{get:async k=>records.has(k)?{json:async()=>records.get(k)}:null,put:async(k,v,o)=>{if(records.has(k))return null;records.set(k,JSON.parse(v));return {etag:'saved'};}},
     fetch:async(url,opts)=>{
       calls.push({url,body:opts.body?JSON.parse(opts.body):null});
@@ -124,13 +124,20 @@ test('Tebex checkout uses catalog ident, supports required authentication and pr
   assert.ok(key.includes(r.calls[0].body.custom.bro_order));
   assert.equal(r.redirects[0].url,checkout);
  }
- const initial=await run('day',verified,{auth:true});
+ const guestPublic=await run('day',null,{feed:'public'});
+ assert.equal(new URL(guestPublic.redirects[0].url,'https://www.broclient.com').searchParams.get('return_to'),'/checkout/day?feed=public');
+ const initial=await run('day',{...verified,discordUsername:'Verified#0',discordAvatar:'https://cdn.discordapp.com/embed/avatars/0.png'},{auth:true,feed:'public'});
+ assert.equal([...initial.records.values()][0].feedVisibility,'public');
+ assert.equal([...initial.records.values()][0].identity.username,'Verified#0');
  assert.equal(initial.redirects[0].url,'https://ident.tebex.io/login');
  const ref=initial.calls[0].body.custom.bro_order;
  assert.ok(new URL(initial.calls[3].url).searchParams.get('returnUrl').includes(ref));
  const resumed=await run('day',verified,{auth:true,callback:ref,records:initial.records});
  assert.equal(resumed.redirects[0].url,checkout);
  assert.equal(resumed.records.size,1);
+ assert.equal([...resumed.records.values()][0].feedVisibility,'public');
+ const hidden=await run('day',verified,{feed:'private'});
+ assert.equal([...hidden.records.values()][0].feedVisibility,'private');
  const wrong=await run('day',{...verified,discordId:'1574096900000000002'},{callback:ref,records:initial.records});
  assert.equal(wrong.calls.length,0);
  assert.equal(wrong.redirects[0].url,'/offres?paiement=indisponible');

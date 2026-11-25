@@ -61,3 +61,13 @@ test('legacy callback returns to account without showing a login document',async
  const login=await send('GET','/auth/login');
  assert.equal(login.url,'/#compte');
 });
+
+test('OAuth preserves the two exact disclosed purchase visibility destinations',async()=>{
+ for(const feed of ['public','private']){
+  const route='/checkout/week?feed='+feed;
+  const result=await send('GET','/auth/discord?return_to='+encodeURIComponent(route));
+  assert.ok(result.headers.get('set-cookie').some(x=>x.includes('__Host-bro-discord-next='+encodeURIComponent(route))));
+ }
+ const bad=await send('GET','/auth/discord?return_to='+encodeURIComponent('/checkout/week?feed=public&redirect=https://evil.invalid'));
+ assert.ok(bad.headers.get('set-cookie').some(x=>x.includes('__Host-bro-discord-next=%2F%23compte')));
+});

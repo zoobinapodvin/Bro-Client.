@@ -220,6 +220,7 @@ async function account(){
       .catch(()=>{if(panel.isConnected)checkbox.disabled=true;});
     checkbox.onchange=()=>saveVisibility(checkbox.checked);
     async function saveVisibility(checked){
+      const previous=checkbox.checked===checked?!checked:checkbox.checked;
       checkbox.disabled=true;revealOld.disabled=true;
       try{
         const response=await fetch('/api/account/publicity',{
@@ -231,7 +232,7 @@ async function account(){
         checkbox.checked=checked;revealOld.hidden=true;
         if(document.querySelector('#purchaseBoard'))refreshRecentBoard();
       }catch{
-        checkbox.checked=!checked;status('Impossible de modifier la visibilité pour le moment.');
+        checkbox.checked=revealOld.hidden?previous:true;status('Impossible de modifier la visibilité pour le moment.');
       }finally{checkbox.disabled=false;revealOld.disabled=false;}
     }
     return panel;
