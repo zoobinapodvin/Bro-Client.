@@ -248,7 +248,7 @@ export default async function handler(req,res) {
     }
     if(path==='/api/account/publicity'){
       if(!user?.discordId)return res.status(401).end();
-      if(req.method==='GET')return res.json({showPublic:await getActivityPreference(bucket,user.discordId)});
+      if(req.method==='GET')return res.json({showPublic:await getActivityPreference(bucket,user.discordId,true),historicalPublic:await getActivityPreference(bucket,user.discordId)});
       if(req.method==='POST'){
         const choice=JSON.parse(payload.toString());
         if(typeof choice?.showPublic!=='boolean')return res.status(422).end();
@@ -327,8 +327,10 @@ export default async function handler(req,res) {
     if(/^\/checkout\/(day|week|month|life)$/.test(path)&&req.method==='GET'){
       const planId=path.split('/').pop();
       const refParam=parsed.searchParams.get('tebex_order');
+      const feedParam=parsed.searchParams.get('feed');
+      const feedVisibility=feedParam==='public'||feedParam==='private'?feedParam:null;
       if(!user?.discordId||!/^\d{17,20}$/.test(user.discordId))
-        return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent(path));
+        return res.redirect(303,'/auth/discord?return_to='+encodeURIComponent(path+(feedVisibility?'?feed='+feedVisibility:'')));
       try{
         const packageId={day:'7832046',week:'7832045',month:'7832044',life:'7832042'}[planId];
         const token=process.env.TEBEX_PUBLIC_TOKEN?.trim();
@@ -371,7 +373,7 @@ export default async function handler(req,res) {
             custom:{bro_order:ref}
           });
           if(typeof basket.ident!=='string'||!/^[A-Za-z0-9-]{10,128}$/.test(basket.ident))throw Error('tebex_basket_invalid');
-          order={provider:'tebex',planId,packageId,basketId:basket.ident,discordId:user.discordId,owner,createdAt:new Date().toISOString()};
+          order={provider:'tebex',planId,packageId,basketId:basket.ident,discordId:user.discordId,owner,feedVisibility,identity:{username:user.discordUsername??null,avatar:user.discordAvatar??null},createdAt:new Date().toISOString()};
           if(!await bucket.put(orderKey,JSON.stringify(order),{onlyIf:{etagDoesNotMatch:'*'}}))throw Error('tebex_order_not_saved');
         }
         const pkg=await call(account+'/packages/'+packageId);

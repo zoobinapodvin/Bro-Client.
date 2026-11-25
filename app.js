@@ -63,7 +63,11 @@ function render(){
     const price=block('div',undefined,'amount');
     price.append(block('strong',new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(plan.price)+' €'),block('small','paiement unique'));
     const title=block('h3',plan.name),desc=block('p',plan.description),cta=link(c.planButton,'/checkout/'+plan.id,'btn plan-button');title.dataset.homeField='title';desc.dataset.homeField='text';cta.dataset.homeField='cta';
-    card.append(row,title,desc,price,cta); return card;
+    cta.href='/checkout/'+plan.id+'?feed=public';
+    const privacy=block('p','Après paiement confirmé, ton nom d’affichage et ta photo Discord peuvent figurer dans les derniers achats publics. ','client-quiet');
+    const anonymous=link('Acheter anonymement','/checkout/'+plan.id+'?feed=private');
+    anonymous.style.textDecoration='underline';privacy.append(anonymous);
+    card.append(row,title,desc,price,cta,privacy); return card;
   }));
   $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');const title=block('summary',c['q'+i]),text=block('p',c['a'+i]);title.dataset.homeField='title';text.dataset.homeField='text';el.append(title,text);if(document.querySelector('[data-home-block="faq-heading"],[data-home-block="offer-faq-heading"]')){const wrap=block('div',undefined,'home-faq-item');wrap.dataset.homeBlock=(document.querySelector('.offers')?'offer-faq-':'faq-')+i;wrap.dataset.homeLabel='Question '+i;wrap.append(el);return wrap;}return el;}));
   window.dispatchEvent(new Event('bro-home-render'));
@@ -204,17 +208,19 @@ async function account(){
   function profileVisibilitySetting(){
     const panel=block('div',undefined,'portal-visibility-setting');
     panel.append(block('strong','Visibilité de mes achats','portal-visibility-title'));
-    panel.append(block('p','Affiche ton pseudo et ta photo Discord dans les derniers achats de la page d’accueil. Cette option est facultative, tu peux la désactiver à tout moment.','portal-visibility-help'));
+    panel.append(block('p','Les nouveaux achats affichent ton nom d’affichage et ta photo Discord par défaut, sauf achat anonyme ou désactivation. Les anciens achats anonymes ne sont pas publiés rétroactivement.','portal-visibility-help'));
     const choice=block('label',undefined,'portal-consent-label');
     const checkbox=block('input');checkbox.type='checkbox';checkbox.disabled=true;
     choice.append(checkbox,block('span','Afficher mon profil Discord dans les derniers achats'));
     panel.append(choice);
+    const revealOld=button('Afficher aussi mes anciens achats',()=>saveVisibility(true),'btn ghost portal-action');revealOld.hidden=true;panel.append(revealOld);
     fetch('/api/account/publicity',{cache:'no-store'})
       .then(response=>{if(!response.ok)throw Error();return response.json();})
-      .then(data=>{if(panel.isConnected){checkbox.checked=data.showPublic===true;checkbox.disabled=false;}})
+      .then(data=>{if(panel.isConnected){checkbox.checked=data.showPublic===true;checkbox.disabled=false;revealOld.hidden=!data.showPublic||data.historicalPublic===true;}})
       .catch(()=>{if(panel.isConnected)checkbox.disabled=true;});
-    checkbox.onchange=async()=>{
-      const checked=checkbox.checked;checkbox.disabled=true;
+    checkbox.onchange=()=>saveVisibility(checkbox.checked);
+    async function saveVisibility(checked){
+      checkbox.disabled=true;revealOld.disabled=true;
       try{
         const response=await fetch('/api/account/publicity',{
           method:'POST',headers:{'Content-Type':'application/json'},
@@ -222,11 +228,12 @@ async function account(){
         });
         if(!response.ok)throw Error();
         status(checked?'Profil visible pour tes achats vérifiés et associés.':'Tes achats resteront anonymes sur le site.');
+        checkbox.checked=checked;revealOld.hidden=true;
         if(document.querySelector('#purchaseBoard'))refreshRecentBoard();
       }catch{
         checkbox.checked=!checked;status('Impossible de modifier la visibilité pour le moment.');
-      }finally{checkbox.disabled=false;}
-    };
+      }finally{checkbox.disabled=false;revealOld.disabled=false;}
+    }
     return panel;
   }
   function show(tab){
@@ -239,7 +246,7 @@ async function account(){
         const text=block('div',undefined,'portal-empty-text');
         text.append(block('span','MES ACCÈS','client-kicker'),block('h3','Aucun pass actif'),block('p','Tes accès seront disponibles après ton premier achat.'));
         empty.append(text,link('Découvrir les offres','/offres','btn client-button-primary portal-action'));
-        viewport.append(empty);
+        viewport.append(empty,profileVisibilitySetting());
         return;
       }
       const active=purchases.filter(p=>p.active);

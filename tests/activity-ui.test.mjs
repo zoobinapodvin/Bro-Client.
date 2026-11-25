@@ -276,3 +276,24 @@ test('Tebex purchases show the real Discord profile on explicit opt-in and respe
  assert.ok(js.includes("viewport.append(profileVisibilitySetting());\n      viewport.append(smallButton('Actualiser mes accès'"));
  assert.ok(js.includes("if(document.querySelector('#purchaseBoard'))refreshRecentBoard();"));
 });
+
+
+test('new disclosed Tebex purchases display automatically, legacy and private purchases stay anonymous, and explicit opt-out wins',async()=>{
+ const b=bucket();
+ const avatar='https://cdn.discordapp.com/avatars/'+discordId+'/current.png';
+ b.objects['private/bro-accounts/v1/'+discordId+'.json']={discordId,displayName:'RealDiscord#0',avatar};
+ const base={provider:'tebex',planId:'week',plan:'Pass Semaine',amount:15,currency:'EUR',discordId,name:'Client BRO',avatar:null,publicIdentity:false};
+ await storeActivity(b,{...base,paymentId:'pay_tebexOLD',date:'2026-11-25T00:01:00Z'});
+ await storeActivity(b,{...base,paymentId:'pay_tebexNEW',date:'2026-11-25T00:02:00Z',autoPublic:true});
+ await storeActivity(b,{...base,paymentId:'pay_tebexPRIVATE',date:'2026-11-25T00:03:00Z',privatePurchase:true});
+ let rows=await recentPurchases(b);
+ assert.deepEqual(rows.map(r=>r.name),['Client BRO','RealDiscord','Client BRO']);
+ assert.equal(rows[1].avatar,avatar);
+ assert.equal(rows[1].discordId,undefined);assert.equal(rows[1].paymentId,undefined);
+ await setActivityPreference(b,{discordId},false);
+ rows=await recentPurchases(b);assert.ok(rows.every(r=>r.name==='Client BRO'&&r.avatar===null));
+ await setActivityPreference(b,{discordId,discordUsername:'RealDiscord',discordAvatar:avatar},true);
+ rows=await recentPurchases(b);assert.deepEqual(rows.map(r=>r.name),['Client BRO','RealDiscord','RealDiscord']);
+ const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.ok(js.includes("'?feed=public'"));assert.ok(js.includes("'?feed=private'"));
+});
