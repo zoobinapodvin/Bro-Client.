@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {listPaidPurchases,accountOverview,assignKey,readCustomerKey,encryptCustomerKey,
- decryptCustomerKey,validUploadedExe,storeRelease,addStockKey,queuePaidKey,stockOverview,ownerStockPath,revealStockKey,importStockKeys,assignPendingStockKey} from '../lib/fulfillment.mjs';
+ decryptCustomerKey,validUploadedExe,storeRelease,addStockKey,queuePaidKey,stockOverview,ownerStockPath,revealStockKey,importStockKeys} from '../lib/fulfillment.mjs';
 import {handleInteraction} from '../lib/discord.mjs';
 import {readFileSync} from 'node:fs';
 
@@ -208,28 +208,27 @@ test('paused automatic license allocation preserves stock, verified pending orde
  assert.ok(await readCustomerKey(store,other,second));
 });
 
-test('manual stock assignment targets a verified pending payment and is idempotent',async t=>{
+test('automatic replenishment serves already-paid waiting orders for matching passes, once each',async t=>{
  const enc=process.env.BRO_KEY_ENCRYPTION_KEY,pause=process.env.BRO_KEY_DELIVERY_PAUSED;
  t.after(()=>{if(enc===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=enc;if(pause===undefined)delete process.env.BRO_KEY_DELIVERY_PAUSED;else process.env.BRO_KEY_DELIVERY_PAUSED=pause;});
  process.env.BRO_KEY_ENCRYPTION_KEY='f'.repeat(64);process.env.BRO_KEY_DELIVERY_PAUSED='false';
- const admin='1027596385123565569',other='1574096900000000003',second='pay_MANUAL123';
+ const admin='1027596385123565569',other='1574096900000000003',second='pay_RESTOCK123';
  const store=bucket({...ledger(),['private/discord-entitlements/'+other+'/'+second]:{paymentId:second,planId:'day',expiresAt:future}});
  const one={discordId:buyer,paymentId:payment,planId:'day',expiresAt:future},two={discordId:other,paymentId:second,planId:'day',expiresAt:future};
- await queuePaidKey(store,one);await queuePaidKey(store,two);
- const input={discordId:other,paymentId:second,key:'TEST-MANUAL-001',operatorId:admin};
- assert.equal((await assignPendingStockKey(store,{...input,operatorId:buyer})).status,'invalid');
- assert.equal((await assignPendingStockKey(store,{...input,paymentId:'pay_FAKE123'})).status,'unverified');
- process.env.BRO_KEY_DELIVERY_PAUSED='true';
- assert.equal((await assignPendingStockKey(store,input)).status,'paused');
- process.env.BRO_KEY_DELIVERY_PAUSED='false';
- assert.equal((await assignPendingStockKey(store,input)).status,'assigned');
- assert.equal((await assignPendingStockKey(store,input)).status,'already_assigned');
- assert.equal(await readCustomerKey(store,other,second),'TEST-MANUAL-001');
- assert.equal(await readCustomerKey(store,buyer,payment),null);
- assert.equal((await stockOverview(store)).counts.day.assigned,1);
- assert.equal((await stockOverview(store)).counts.day.waiting,1);
- assert.equal((await assignPendingStockKey(store,{discordId:buyer,paymentId:payment,key:input.key,operatorId:admin})).status,'duplicate');
- assert.equal((await addStockKey(store,{planId:'day',key:'TEST-AUTO-002',operatorId:admin})).assigned,true);
- assert.equal((await stockOverview(store)).counts.day.assigned,2);
- assert.equal((await stockOverview(store)).counts.day.waiting,0);
+ assert.equal((await queuePaidKey(store,one)).status,'waiting_stock');
+ assert.equal((await queuePaidKey(store,two)).status,'waiting_stock');
+ await addStockKey(store,{planId:'week',key:'TEST-WEEK-RESTOCK',operatorId:admin});
+ assert.equal((await stockOverview(store)).counts.day.waiting,2);
+ await importStockKeys(store,{planId:'day',rows:[{key:'TEST-LOCKED-RESTOCK',status:'sold'},{key:'TEST-VALID-RESTOCK-1',status:'available'},{key:'TEST-VALID-RESTOCK-2',status:'available'}],operatorId:admin});
+ assert.equal(await readCustomerKey(store,buyer,payment),'TEST-VALID-RESTOCK-1');
+ assert.equal(await readCustomerKey(store,other,second),'TEST-VALID-RESTOCK-2');
+ const overview=await stockOverview(store);
+ assert.equal(overview.counts.day.waiting,0);assert.equal(overview.counts.day.available,0);
+ assert.equal(overview.rows.filter(r=>r.planId==='day'&&r.status==='assigned').length,2);
+ assert.equal(overview.counts.week.available,1);
+ assert.equal((await queuePaidKey(store,one)).status,'assigned');
+ assert.equal((await addStockKey(store,{planId:'day',key:'TEST-VALID-RESTOCK-1',operatorId:admin})).status,'duplicate');
+ const ui=readFileSync(new URL('../key-stock.js',import.meta.url),'utf8');
+ const api=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
+ assert.doesNotMatch(ui,/Attribuer une clé|endpoint\+'\/assign'/);assert.doesNotMatch(api,/\/api\/admin\/key-stock\/assign/);
 });
