@@ -12,7 +12,7 @@ function saleDate(row){return row.assignedAt||null;}
 const notice=(message,type='info')=>{const b=$('#banner');b.hidden=!message;b.textContent=message;b.dataset.type=type;};
 const formStatus=(message,type='info')=>{const b=$('#status');b.textContent=message;b.dataset.type=type;};
 function busy(button,on,label){if(on){button.dataset.original=button.textContent;button.replaceChildren(el('span','', 'spinner'),document.createTextNode(label));button.disabled=true;button.setAttribute('aria-busy','true');}else{button.textContent=button.dataset.original||button.textContent;button.disabled=false;button.removeAttribute('aria-busy');}}
-async function request(url,options={}){const r=await fetch(url,{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(20000),...options});let body;try{body=await r.json();}catch{body={};}if(!r.ok){if(r.status===401||r.status===404&&url===endpoint&&(!options.method||options.method==='GET')){data=null;++revealSeq;$('#revealed').value='';if($('#key-dialog').open)$('#key-dialog').close();for(const id of ['inventory','pending','summary'])$('#'+id).replaceChildren();for(const node of document.querySelectorAll('#nav b'))node.textContent='—';}const e=Error(body.error||(r.status===409?'Cette clé est déjà enregistrée.':r.status===404||r.status===401?'Session propriétaire expirée. Reconnecte-toi.':'Requête refusée ('+r.status+').'));e.status=r.status;throw e;}return body;}
+async function request(url,options={}){const r=await fetch(url,{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(20000),...options});let body;try{body=await r.json();}catch{body={};}if(!r.ok){if(r.status===401||r.status===404&&url===endpoint&&(!options.method||options.method==='GET')){data=null;++revealSeq;$('#revealed').value='';if($('#key-dialog').open)$('#key-dialog').close();for(const id of ['inventory','pending','summary','overview-totals','quick-filters'])$('#'+id).replaceChildren();for(const node of document.querySelectorAll('#nav b'))node.textContent='—';}const e=Error(body.error||(r.status===409?'Cette clé est déjà enregistrée.':r.status===404||r.status===401?'Session propriétaire expirée. Reconnecte-toi.':'Requête refusée ('+r.status+').'));e.status=r.status;throw e;}return body;}
 const empty=(title,description)=>{const box=el('div',undefined,'empty');box.append(el('span','◇','empty-icon'),el('strong',title),el('p',description));return box;};
 function table(rows,cols,kind='stock'){const t=el('table',undefined,'stock-table '+kind);t.setAttribute('role','table');const head=el('thead'),hr=el('tr');for(const c of cols){const th=el('th',c[0]);th.scope='col';hr.append(th);}head.append(hr);t.append(head);const body=el('tbody');for(const row of rows){const tr=el('tr');tr.setAttribute('role','row');for(const c of cols){const td=el('td'),value=c[1](row);td.dataset.label=c[0];td.dataset.cell=c[2]||'';td.setAttribute('role','cell');if(value instanceof Node)td.append(value);else td.textContent=value??'—';tr.append(td);}body.append(tr);}t.append(body);return t;}
 const views={
@@ -57,7 +57,7 @@ function render(){
   $('#summary').classList.toggle('single',v.category);
   if(v.preview){
     const totals=Object.values(data.counts).reduce((a,n)=>({available:a.available+n.available,assigned:a.assigned+n.assigned,waiting:a.waiting+n.waiting}),{available:0,assigned:0,waiting:0});
-    $('#overview-totals').replaceChildren(createStat(totals.available,'Clés en stock','ready',()=>selectPlan('inventory')),createStat(totals.assigned,'Clés vendues','sold',()=>selectPlan('legacy')),createStat(totals.waiting,'Commandes en attente','waiting',()=>selectPlan('pending')));
+    $('#overview-totals').replaceChildren(createStat(totals.available,'Clés en stock','ready',()=>{selectPlan('inventory');$('#state').value='available';render();}),createStat(totals.assigned,'Clés vendues','sold',()=>selectPlan('legacy')),createStat(totals.waiting,'Commandes en attente','waiting',()=>selectPlan('pending')));
     $('#summary').replaceChildren(...groups.map(([id,n])=>{
       const card=el('button',undefined,'metric pass-overview');card.type='button';card.onclick=()=>selectPlan(id);card.setAttribute('aria-label','Consulter le pass '+labels[id]);
       const top=el('div',undefined,'metric-top');top.append(el('span',labels[id]),el('span','›','metric-icon'));
@@ -68,13 +68,13 @@ function render(){
   }else{
     const n=data.counts[selected];
     const applyFilter=value=>{ $('#state').value=value;page=1;render();};
-    $('#summary').replaceChildren(createStat(n.available,'Disponibles','ready',()=>applyFilter('available')),createStat(n.assigned,'Vendues','sold',()=>applyFilter('sold-all')),createStat(n.waiting,'En attente','waiting',()=>selectPlan('pending')));
+    $('#summary').replaceChildren(createStat(n.available,'Disponibles','ready',()=>applyFilter('available')),createStat(n.assigned,'Vendues','sold',()=>applyFilter('sold-all')),createStat(n.waiting,'En attente','waiting',null));
   }
  }
  if(v.pending){
   const pending=data.pending;$('#pending-count').textContent=pending.length;
   const rows=v.preview?pending.slice(0,5):pending;
-  $('#pending').replaceChildren(rows.length?table(rows,[['Jeu',gameName,'game'],['Pass',r=>labels[r.planId],'pass'],['Compte Discord',r=>r.discordId],['Paiement',r=>r.paymentId],['Accès Discord',remaining],['Livraison',r=>el('span',r.expiresAt&&Date.parse(r.expiresAt)<=Date.now()?'Accès terminé':data.deliveryPaused?'Suspendue':'En attente','badge waiting')]]):el('p','Aucune commande en attente.','compact-empty'));
+  $('#pending').replaceChildren(rows.length?table(rows,[['Jeu',gameName,'game'],['Pass',r=>labels[r.planId],'pass'],['Compte Discord',r=>r.discordId,'account'],['Paiement',r=>r.paymentId,'payment'],['Accès Discord',remaining,'date'],['Livraison',r=>el('span',r.expiresAt&&Date.parse(r.expiresAt)<=Date.now()?'Accès terminé':data.deliveryPaused?'Suspendue':'En attente','badge waiting'),'status']],'pending-table'):el('p','Aucune commande en attente.','compact-empty'));
   if(v.preview&&pending.length>5){const more=el('button','Voir les '+pending.length+' commandes →','secondary small');more.onclick=()=>selectPlan('pending');$('#pending').append(more);}
  }
  if(!v.inventory)return;
@@ -135,4 +135,4 @@ $('#xlsx-confirm').onclick=async()=>{
  finally{submitting=false;field.disabled=false;busy(button,false);button.disabled=!workbookPreview;if(!data)load();}
 };
 
-window.addEventListener('pagehide',()=>{++revision;++revealSeq;data=null;workbookPreview=null;$('#revealed').value='';$('#key').value='';$('#import-rows').value='';$('#xlsx-file').value='';if($('#key-dialog').open)$('#key-dialog').close();for(const id of ['inventory','pending','summary'])$('#'+id).replaceChildren();});window.addEventListener('pageshow',e=>{if(e.persisted)location.reload();});
+window.addEventListener('pagehide',()=>{++revision;++revealSeq;data=null;workbookPreview=null;++workbookRequest;$('#revealed').value='';$('#key').value='';$('#import-rows').value='';$('#xlsx-file').value='';if($('#key-dialog').open)$('#key-dialog').close();for(const id of ['inventory','pending','summary','overview-totals','quick-filters'])$('#'+id).replaceChildren();});window.addEventListener('pageshow',e=>{if(e.persisted)location.reload();});
