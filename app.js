@@ -539,12 +539,12 @@ async function loadUser(){
 }
 document.querySelectorAll('i[data-icon]').forEach(el=>{el.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+paths[el.dataset.icon]+'</svg>';});
 $('.close').onclick=()=>modal.close();modal.addEventListener('click',e=>{if(e.target===modal){const r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)modal.close();}});
-document.querySelectorAll('[data-account]').forEach(el=>{el.onclick=openAccountPage;el.addEventListener('pointerenter',warmAccount,{passive:true});el.addEventListener('focus',warmAccount);});
+document.querySelectorAll('[data-account]').forEach(el=>{el.onclick=openAccountPage;const warm=()=>{if(!$('#accountPage'))warmAccount();};el.addEventListener('pointerenter',warm,{passive:true});el.addEventListener('focus',warm);});
 
 const menu=$('nav');const hamburger=$('.hamb');hamburger.onclick=()=>{const show=menu.classList.toggle('open');hamburger.setAttribute('aria-expanded',String(show));};
 menu.querySelectorAll('a').forEach(el=>el.onclick=()=>{menu.classList.remove('open');hamburger.setAttribute('aria-expanded','false');});
 const sections=Array.from(menu.querySelectorAll('a[href^="#"]')).map(a=>[a,document.getElementById(a.hash.slice(1))]).filter(([,section])=>section);
-function updateNav(){if(!sections.length)return;let current=sections[0];for(const pair of sections)if(pair[1].getBoundingClientRect().top<=180)current=pair;for(const [a] of sections)if(a===current[0])a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');}
+function updateNav(){if($('#accountPage')||!sections.length)return;let current=sections[0];for(const pair of sections)if(pair[1].getBoundingClientRect().top<=180)current=pair;for(const [a] of sections)if(a===current[0])a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');}
 window.addEventListener('scroll',updateNav,{passive:true});
 if(location.hash==='#tarifs')location.replace('/offres');
 if(location.hash==='#compte'&&!$('#accountPage'))location.replace('/espace-client'+location.search);
