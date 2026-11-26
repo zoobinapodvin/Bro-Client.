@@ -11,12 +11,13 @@ const paths = {
   menu:'<path d="M3 6h18M3 12h18M3 18h18"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>'
 };
 let site, user = null, accountReady = false;
-let sessionRequest=null,overviewRequest=null,preloadedOverview=null,overviewAt=0,sessionEpoch=0;
+let sessionRequest=null,overviewRequest=null,preloadedOverview=null,overviewAt=0,sessionEpoch=0,sessionAt=0;
+const sessionFresh=()=>accountReady&&Date.now()-sessionAt<30000;
 const freshOverview=()=>preloadedOverview&&Date.now()-overviewAt<30000?preloadedOverview:null;
 async function requestOverview(){
  if(overviewRequest)return overviewRequest;
  const epoch=sessionEpoch;
- const pending=(async()=>{const r=await fetch('/api/account/overview',{cache:'no-store'});if(!r.ok)throw Error('overview');const value=await r.json();if(epoch!==sessionEpoch||!user)throw Error('session_changed');preloadedOverview=value;overviewAt=Date.now();return value;})();
+ const pending=(async()=>{const r=await fetch('/api/account/overview',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(r.status===401&&epoch===sessionEpoch){sessionEpoch++;user=null;accountReady=false;sessionAt=0;preloadedOverview=null;overviewAt=0;syncGuideNavigation();if($('#accountPage'))account();throw Error('session_expired');}if(!r.ok)throw Error('overview');const value=await r.json();if(epoch!==sessionEpoch||!user)throw Error('session_changed');preloadedOverview=value;overviewAt=Date.now();return value;})();
  overviewRequest=pending;try{return await pending;}finally{if(overviewRequest===pending)overviewRequest=null;}
 }
 function syncGuideNavigation(){document.querySelectorAll('[data-paid-guides]').forEach(el=>{el.hidden=user?.guideAccess!==true;});document.querySelectorAll('[data-guest-checkout-note]').forEach(el=>{el.hidden=true;});window.dispatchEvent(new Event('bro-session-changed'));}
@@ -111,18 +112,52 @@ function discordButton(text,href,cls='btn discord-connect'){
   const icon=block('span',undefined,'discord-brand-icon');icon.innerHTML=discordMark;
   el.prepend(icon);return el;
 }
+
+const accountSkeletonHTML="<div class=\"account-layout account-skeleton\" aria-hidden=\"true\"><aside class=\"account-sidebar\"><div class=\"account-skeleton-profile\"><span></span><div><b></b><i></i></div></div><div class=\"account-skeleton-nav\"><span>Mes clés</span><span>Mes achats</span><span>Assistance</span><span>Paramètres</span></div></aside><div class=\"account-main\"><div class=\"account-section-head\"><div><span class=\"account-eyebrow\">ESPACE PERSONNEL</span><h2>Mes clés</h2><p class=\"client-quiet\">Retrouve les clés associées à tes commandes.</p></div></div><div class=\"account-metrics\"><div class=\"account-metric\"><strong class=\"account-skeleton-bar\"></strong><span>Clés disponibles</span></div><div class=\"account-metric\"><strong class=\"account-skeleton-bar\"></strong><span>En attente de stock</span></div><div class=\"account-metric\"><strong class=\"account-skeleton-bar\"></strong><span>Pass achetés</span></div></div><div class=\"account-key-card account-skeleton-key\"><div class=\"account-skeleton-bar\"></div><div class=\"account-skeleton-bar\"></div></div></div></div>";
+function paintAccountSkeleton(root){
+ root.setAttribute('aria-busy','true');
+ root.innerHTML=accountSkeletonHTML;
+}
+let accountNavigationMounted=false;
+function warmAccount(){
+ if(sessionRequest||sessionFresh())return;
+ loadUser().catch(()=>{});
+}
+function openAccountPage(){
+ const existing=$('#accountPage');
+ if(existing){if(modal.open)modal.close();if(!existing.querySelector('.account-layout:not(.account-skeleton)')&&!existing.querySelector('.portal-welcome'))account();return;}
+ const original=$('main#main');
+ if(!original){location.assign('/espace-client');return;}
+ if(modal.open)modal.close();
+ const section=block('main',undefined,'shell account-page-main');section.id='main';
+ section.innerHTML="<div class=\"account-intro\"><div><span class=\"account-eyebrow\">BRO CLIENT / ESPACE PRIVÉ</span><h1>Mon espace client<span>.</span></h1><p>Tes clés, tes achats et ton compte, au même endroit.</p></div><span class=\"account-private\">Espace sécurisé</span></div>";
+ const root=block('section');root.id='accountPage';root.setAttribute('aria-label','Espace client');paintAccountSkeleton(root);section.append(root);
+ // Keep the actual navigation URL, without a new document or another round-trip.
+ for(const a of document.querySelectorAll('header a[href^="#"],footer a[href^="#"]')){const href=a.getAttribute('href');a.setAttribute('href',location.pathname+href);}
+ for(const a of document.querySelectorAll('header nav [aria-current]'))a.removeAttribute('aria-current');
+ original.id='broPreviousMain';original.hidden=true;original.setAttribute('inert','');original.after(section);
+ document.body.classList.remove('patchnotes-page');document.body.classList.add('account-page');
+ document.querySelector('header [data-account]')?.setAttribute('aria-current','page');
+ document.querySelector('nav')?.classList.remove('open');document.querySelector('.hamb')?.setAttribute('aria-expanded','false');
+ document.title='Mon espace client · BRO CLIENT';
+ let robots=document.querySelector('meta[name="robots"]');if(!robots){robots=block('meta');robots.name='robots';document.head.append(robots);}robots.content='noindex,nofollow';
+ accountNavigationMounted=true;history.pushState({broAccount:true},'','/espace-client');window.scrollTo(0,0);
+ if(!sessionFresh())warmAccount();
+ account();
+}
+window.addEventListener('popstate',()=>{if(accountNavigationMounted&&location.pathname!=='/espace-client')location.reload();});
+window.addEventListener('pagehide',()=>{const root=$('#accountPage');if(root){sessionEpoch++;sessionRequest=null;overviewRequest=null;preloadedOverview=null;overviewAt=0;sessionAt=0;accountReady=false;user=null;paintAccountSkeleton(root);}});
+window.addEventListener('pageshow',e=>{if(e.persisted&&$('#accountPage')){loadUser();account();}});
+
 async function account(){
   const body=$('#accountPage');
-  if(!body){location.assign('/espace-client');return;}
+  if(!body){openAccountPage();return;}
   if(modal.open)modal.close();
+  if(!sessionFresh()&&sessionRequest){paintAccountSkeleton(body);await sessionRequest;if(body.isConnected)return account();return;}
   body.replaceChildren();
-  body.setAttribute('aria-busy',String(!accountReady&&!!sessionRequest));
+  body.setAttribute('aria-busy','false');
   const notice=block('p','','client-status-message');
   notice.setAttribute('role','status');
-  if(!accountReady&&sessionRequest){
-    body.append(block('p','Vérification de ta session…','client-quiet'));
-    await sessionRequest;if(body.isConnected)return account();return;
-  }
   if(!accountReady){
     body.append(block('p','Impossible de récupérer ta session.','client-quiet'),
       button('Réessayer',async()=>{await loadUser();account();},'btn client-button-primary'));
@@ -137,7 +172,7 @@ async function account(){
     if(callbackStatus==='interrompue'||callbackStatus==='indisponible'){
       welcome.append(block('p',callbackStatus==='interrompue'?'La connexion Discord a été interrompue. Tu peux réessayer.':'Discord est temporairement indisponible. Réessaie dans un instant.'));
     }
-    welcome.append(discordButton('Continuer avec Discord','/auth/discord'));
+    welcome.append(discordButton('Continuer avec Discord','/auth/discord?return_to=%2Fespace-client'));
     body.append(welcome);
     return;
   }
@@ -182,7 +217,7 @@ async function account(){
     try{
       const res=await fetch('/auth/unlink',{method:'POST'});
       if(!res.ok)throw Error();
-      sessionEpoch++;user=null;preloadedOverview=null;overviewAt=0;overviewRequest=null;syncGuideNavigation();account();
+      sessionEpoch++;sessionRequest=null;user=null;accountReady=true;sessionAt=Date.now();preloadedOverview=null;overviewAt=0;overviewRequest=null;syncGuideNavigation();account();
     }catch{notice.textContent='Déconnexion indisponible. Réessaie.';logout.disabled=false;}
   },'portal-logout');
   const discordLogo=block('span',undefined,'discord-brand-icon');discordLogo.innerHTML=discordMark;
@@ -245,7 +280,7 @@ async function account(){
     current=tab;viewport.replaceChildren();
     for(const [id,el] of tabButtons){el.classList.toggle('active',id===tab);el.setAttribute('aria-selected',String(id===tab));el.tabIndex=id===tab?0:-1;}viewport.setAttribute('aria-labelledby','account-tab-'+tab);
     if(tab==='access'){
-      if(!overview){viewport.append(block('div','Vérification des accès…','portal-loading'));return;}
+      if(!overview){const head=block('div',undefined,'account-section-head');const title=block('div');title.append(block('span','ESPACE PERSONNEL','account-eyebrow'),block('h2','Mes clés'),block('p','Retrouve les clés associées à tes commandes.','client-quiet'));head.append(title);const preview=block('div',undefined,'account-key-card account-skeleton-key');preview.setAttribute('aria-hidden','true');preview.append(block('div',undefined,'account-skeleton-bar'),block('div',undefined,'account-skeleton-bar'));viewport.append(head,preview);return;}
       const display={day:'Pass Jour',week:'Pass Semaine',month:'Pass Mois',life:'Pass Lifetime'};
       const active=purchases.filter(p=>p.active);
       const head=block('div',undefined,'account-section-head');
@@ -499,12 +534,12 @@ function editor(){
 async function loadUser(){
  if(sessionRequest)return sessionRequest;
  const epoch=sessionEpoch;
- const pending=(async()=>{try{const response=await fetch('/api/me',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json();if(epoch!==sessionEpoch)return;user=data.user;accountReady=true;preloadedOverview=user?data.overview??null:null;overviewAt=Date.now();if(user&&!preloadedOverview)requestOverview().catch(()=>{});}catch{if(epoch===sessionEpoch){accountReady=false;user=null;preloadedOverview=null;}}finally{syncGuideNavigation();}})();
+ const pending=(async()=>{try{const response=await fetch('/api/me',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error();const data=await response.json();if(epoch!==sessionEpoch)return;sessionEpoch++;overviewRequest=null;user=data.user;accountReady=true;sessionAt=Date.now();preloadedOverview=user?data.overview??null:null;overviewAt=Date.now();if(user&&!preloadedOverview)requestOverview().catch(()=>{});}catch{if(epoch===sessionEpoch){accountReady=false;sessionAt=0;user=null;preloadedOverview=null;}}finally{syncGuideNavigation();}})();
  sessionRequest=pending;try{return await pending;}finally{if(sessionRequest===pending)sessionRequest=null;}
 }
 document.querySelectorAll('i[data-icon]').forEach(el=>{el.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+paths[el.dataset.icon]+'</svg>';});
 $('.close').onclick=()=>modal.close();modal.addEventListener('click',e=>{if(e.target===modal){const r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)modal.close();}});
-document.querySelectorAll('[data-account]').forEach(el=>el.onclick=()=>account());
+document.querySelectorAll('[data-account]').forEach(el=>{el.onclick=openAccountPage;el.addEventListener('pointerenter',warmAccount,{passive:true});el.addEventListener('focus',warmAccount);});
 
 const menu=$('nav');const hamburger=$('.hamb');hamburger.onclick=()=>{const show=menu.classList.toggle('open');hamburger.setAttribute('aria-expanded',String(show));};
 menu.querySelectorAll('a').forEach(el=>el.onclick=()=>{menu.classList.remove('open');hamburger.setAttribute('aria-expanded','false');});
@@ -515,10 +550,12 @@ if(location.hash==='#tarifs')location.replace('/offres');
 if(location.hash==='#compte'&&!$('#accountPage'))location.replace('/espace-client'+location.search);
 window.addEventListener('hashchange',()=>{if(location.hash==='#compte'&&!$('#accountPage'))location.assign('/espace-client'+location.search);});
 (async()=>{
-  const session=loadUser();
-  try{const res=await fetch('/api/site',{cache:'no-store'});if(!res.ok)throw Error();site=await res.json();if(!site.content||!site.plans)throw Error();}
-  catch{site=await(await fetch('/defaults.json')).json();}
-  render();await session;if($('#accountPage'))account();
+  loadUser();
+  // The account never waits for public marketing/configuration requests.
+  if($('#accountPage'))account();
+  try{const res=await fetch('/api/site',{cache:'no-store',signal:AbortSignal.timeout(8000)});if(!res.ok)throw Error();site=await res.json();if(!site.content||!site.plans)throw Error();}
+  catch{try{site=await(await fetch('/defaults.json')).json();}catch{return;}}
+  render();
 })();
 
 
