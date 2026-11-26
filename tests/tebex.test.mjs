@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {completeTebexPayment,verifyTebexBasket,recoverConfiguredTebexPayment,fetchTebexPayment} from '../lib/tebex.mjs';
+import {completeTebexPayment,verifyTebexBasket,recoverConfiguredTebexPayment,fetchTebexPayment,retryTebexPublicNotices} from '../lib/tebex.mjs';
 import {addStockKey,readCustomerKey,stockOverview} from '../lib/fulfillment.mjs';
 import {recentPurchases,storeActivity} from '../lib/activity.mjs';
 const discordId='1574096900000000001',owner='a'.repeat(64),ref='01234567-1234-1234-1234-0123456789ab',ownerId='1027596385123565569';
@@ -98,4 +98,30 @@ test('configured Tebex recovery fetches the exact completed transaction and cann
  process.env.TEBEX_PROJECT_ID='test-project';process.env.TEBEX_PRIVATE_KEY='test-key';
  globalThis.fetch=async(url,options)=>{assert.equal(url,'https://checkout.tebex.io/api/payments/'+transactionId+'?type=txn_id');assert.equal(options.headers.Authorization,'Basic '+Buffer.from('test-project:test-key').toString('base64'));return Response.json(event.subject);};
  assert.deepEqual(await fetchTebexPayment(transactionId),event.subject);
+});
+
+test('Discord public 404 never rejects two distinct purchases by the same account; independent retry is idempotent',async t=>{
+ const old=process.env.BRO_KEY_ENCRYPTION_KEY,pause=process.env.BRO_KEY_DELIVERY_PAUSED;
+ process.env.BRO_KEY_ENCRYPTION_KEY='3'.repeat(64);process.env.BRO_KEY_DELIVERY_PAUSED='false';
+ t.after(()=>{if(old===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=old;if(pause===undefined)delete process.env.BRO_KEY_DELIVERY_PAUSED;else process.env.BRO_KEY_DELIVERY_PAUSED=pause;});
+ const b=bucket(),secondRef='01234567-1234-1234-1234-0123456789ac';
+ await setup(b,'day');const original=await (await b.get('private/tebex/orders/'+ref+'.json')).json();
+ await b.put('private/tebex/orders/'+secondRef+'.json',JSON.stringify(original));
+ for(const key of ['TEST-FIRST-KEY','TEST-SECOND-KEY','TEST-SPARE-KEY'])await addStockKey(b,{planId:'day',key,operatorId:ownerId});
+ let verified=0,roles=0;
+ const deps={verifyBasket:async()=>{verified++;return {currency:'EUR',total_price:6};},reconcile:async()=>{roles++;return {status:'role_granted'};},notify:async()=>({ok:true}),publicNotify:async()=>({configured:true,ok:false,status:404})};
+ const first=eventFor('day','tbx-repeat-first'),second=eventFor('day','tbx-repeat-second');second.subject.custom.bro_order=secondRef;
+ for(const event of [first,second,first,second]){const result=await completeTebexPayment(b,event,deps);assert.equal(result.status,200);assert.equal(result.body.delivery,'assigned');}
+ assert.equal(verified,2);assert.equal(roles,2);
+ const stock=await stockOverview(b);assert.equal(stock.counts.day.assigned,2);assert.equal(stock.counts.day.available,1);
+ const assigned=stock.rows.filter(r=>r.paymentId);assert.notEqual(assigned[0].paymentId,assigned[1].paymentId);
+ assert.notEqual(await readCustomerKey(b,discordId,assigned[0].paymentId),await readCustomerKey(b,discordId,assigned[1].paymentId));
+ for(const r of assigned){const marker='private/tebex/processed/'+r.paymentId+'.json';assert.equal((await (await b.get(marker)).json()).publicOk,false);await b.put(marker+'.public-lease',JSON.stringify({until:0}));}
+ let announcements=0;
+ const retry=await retryTebexPublicNotices(b,{publicNotify:async()=>{announcements++;return {ok:true,configured:true};}});
+ assert.equal(retry.sent,2);assert.equal(announcements,2);
+ await retryTebexPublicNotices(b,{publicNotify:async()=>{throw Error('already sent');}});
+ assert.equal(announcements,2);assert.equal((await stockOverview(b)).counts.day.assigned,2);
+ const rejected=eventFor('day','tbx-unverified-new');rejected.subject.status.id=0;
+ assert.equal((await completeTebexPayment(b,rejected,deps)).status,422);
 });

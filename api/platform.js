@@ -13,7 +13,7 @@ import {accountOverview,readCustomerKey,ownerStockPath,stockOverview,addStockKey
 import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary,rebuildRecentIndex} from '../lib/activity.mjs';
 import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
 import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
-import {completeTebexPayment,recoverConfiguredTebexPayment} from '../lib/tebex.mjs';
+import {completeTebexPayment,recoverConfiguredTebexPayment,retryTebexPublicNotices} from '../lib/tebex.mjs';
 import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides,CUSTOMER_GUIDES_KEY,customerGuideIndex,selectCustomerGuide} from '../lib/customer-guides.mjs';
 // Profile persistence must never block authentication or the checkout route.
 async function rememberAccount(user){
@@ -120,6 +120,13 @@ export default async function handler(req,res) {
     const payload=req.method==='POST'?await body(req,
       path==='/api/admin/release'?4*1024*1024:(path==='/api/media'||path==='/api/homepage/media')?4*1024*1024:isWebhook?250000:100000):undefined;
     if(isInteraction&&req.method==='POST')return handleInteraction(req,res,payload,bucket);
+    if(path==='/api/tebex/notifications/cron'&&req.method==='GET'){
+      const secret=process.env.CRON_SECRET;
+      if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();
+      const result=await retryTebexPublicNotices(bucket);
+      console.info('Tebex public notification retry',result);
+      return res.json(result);
+    }
     if(path==='/api/discord/cron'&&req.method==='GET'){
       const secret=process.env.CRON_SECRET;
       if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();

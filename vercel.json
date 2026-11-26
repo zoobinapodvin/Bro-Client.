@@ -65,6 +65,10 @@
     {
       "path": "/api/discord/cron",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/tebex/notifications/cron",
+      "schedule": "15 * * * *"
     }
   ],
   "headers": [
