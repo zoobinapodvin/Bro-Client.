@@ -443,7 +443,7 @@ async function account(){
       if(active.length){const launcherNotice=block('p','Pour télécharger le launcher, c’est ','client-quiet');const launcherLink=link('ici','https://discord.com/channels/1448897452404117558/1574774596706508821');launcherLink.style.textDecoration='underline';launcherLink.target='_blank';launcherLink.rel='noopener noreferrer';launcherNotice.append(launcherLink,'.');viewport.append(launcherNotice);}
     }else if(tab==='orders'){
       const head=block('div',undefined,'account-section-head');
-      head.append(accountHeading('Mes achats','Retrouve tes commandes et leurs justificatifs.'),smallButton('Actualiser',()=>{purchaseHistory=null;renderPurchaseHistory(historyTarget,true);refresh(true);},'btn ghost account-history-refresh'));
+      const refreshHistory=smallButton('Actualiser',()=>{purchaseHistory=null;renderPurchaseHistory(historyTarget,true);refresh(true);},'btn ghost account-history-refresh');refreshHistory.setAttribute('aria-label','Actualiser mes achats');head.append(accountHeading('Mes achats','Retrouve tes commandes et leurs justificatifs.'),refreshHistory);
       const historyTarget=block('div',undefined,'account-history');viewport.append(head,historyTarget);
       renderPurchaseHistory(historyTarget);
     }else if(tab==='help'){
