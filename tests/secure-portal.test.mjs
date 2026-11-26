@@ -262,3 +262,23 @@ test('account purchase dates use owned verified records, never expiry or another
  const overview=await accountOverview(store,{id:ownerId,discordId:buyer});
  assert.deepEqual(overview.purchases.map(p=>[p.paymentId,p.purchaseDate]),[[newer,'2026-11-25T12:00:00.000Z'],[older,'2026-11-20T12:00:00.000Z'],[unknown,null]]);
 });
+
+test('private stock manager uses distinct local views without changing owner checks or delivery routes',()=>{
+ const ui=readFileSync(new URL('../key-stock.js',import.meta.url),'utf8');
+ const api=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../key-stock.css',import.meta.url),'utf8');
+ assert.match(api,/if\(!privatePath\|\|!\(path===privatePath\|\|path===privatePath\+'\/stock'\)\)return res.status\(404\)/);
+ assert.match(api,/if\(!ownerStockPath\(user\)\)return res.status\(404\)/);
+ for(const id of ['supply-view','pending-view','inventory-view','inventory-filters','view-all'])assert.ok(api.includes(id));
+ const start=ui.indexOf('function viewState('),end=ui.indexOf('function selectPlan(',start);
+ const view=Function(ui.slice(start,end)+';return viewState;')();
+ assert.deepEqual(view('all'),{category:false,summary:true,supply:false,pending:true,inventory:true,preview:true});
+ assert.deepEqual(view('week'),{category:true,summary:true,supply:false,pending:false,inventory:true,preview:false});
+ assert.equal(view('supply').inventory,false);assert.equal(view('supply').supply,true);
+ assert.equal(view('pending').pending,true);assert.equal(view('pending').inventory,false);
+ assert.equal(view('legacy').summary,false);assert.equal(view('legacy').inventory,true);
+ const selection=ui.slice(ui.indexOf('function selectPlan('),ui.indexOf('function render()'));
+ assert.doesNotMatch(selection,/fetch\(|request\(|\bload\(/);
+ assert.match(ui,/if\(!v.inventory\)return/);assert.match(css,/\[hidden\]\{display:none!important\}/);
+ assert.match(ui,/pagehide/);assert.match(ui,/if\(v.preview&&pending.length>5\)/);
+});
