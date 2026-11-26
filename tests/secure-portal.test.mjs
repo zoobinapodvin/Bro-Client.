@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {generateKeyPairSync,sign} from 'node:crypto';
+import {generateKeyPairSync,sign,createHash} from 'node:crypto';
 import {listPaidPurchases,accountOverview,assignKey,readCustomerKey,encryptCustomerKey,
  decryptCustomerKey,validUploadedExe,storeRelease,addStockKey,queuePaidKey,stockOverview,ownerStockPath,revealStockKey,importStockKeys} from '../lib/fulfillment.mjs';
 import {handleInteraction} from '../lib/discord.mjs';
@@ -244,4 +244,21 @@ test('guide index exposes titles only and resolves the exact guide without expos
  assert.match(html,/\/espace-client\?tab=guides/);
  const api=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
  assert.match(api,/if\(parsed.searchParams.get\('view'\)==='index'\)\{\s*if\(!await canReadCustomerGuides\(bucket,user\)\)/);
+});
+
+test('account purchase dates use owned verified records, never expiry or another account',async()=>{
+ const ownerId='auth-a',otherId='auth-b',older='pay_OLD',newer='pay_NEW',unknown='pay_UNKNOWN';
+ const ownerPrefix='private/invoices/'+createHash('sha256').update(ownerId).digest('hex')+'/';
+ const otherPrefix='private/invoices/'+createHash('sha256').update(otherId).digest('hex')+'/';
+ const store=bucket({
+ [prefix+older]:{paymentId:older,planId:'life',expiresAt:null},
+ [prefix+newer]:{paymentId:newer,planId:'day',expiresAt:future},
+ [prefix+unknown]:{paymentId:unknown,planId:'week',expiresAt:future},
+ [ownerPrefix+older]:{id:older,date:'2026-11-20T12:00:00Z'},
+ ['private/activity/receipts/'+newer+'.json']:{paymentId:newer,discordId:buyer,planId:'day',date:'2026-11-25T12:00:00Z'},
+ [otherPrefix+unknown]:{id:unknown,date:'2026-11-26T12:00:00Z'},
+ ['private/activity/receipts/'+unknown+'.json']:{paymentId:unknown,discordId:owner,planId:'week',date:'2026-11-26T12:00:00Z'}
+ });
+ const overview=await accountOverview(store,{id:ownerId,discordId:buyer});
+ assert.deepEqual(overview.purchases.map(p=>[p.paymentId,p.purchaseDate]),[[newer,'2026-11-25T12:00:00.000Z'],[older,'2026-11-20T12:00:00.000Z'],[unknown,null]]);
 });

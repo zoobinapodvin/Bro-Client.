@@ -395,52 +395,65 @@ async function account(){
     }
     purchaseHistoryRequest.then(()=>renderPurchaseHistory(target)).catch(()=>{if(target.isConnected&&current==='orders'&&!purchaseHistoryRequest)target.replaceChildren(block('p','Historique momentanément indisponible.','client-quiet'),smallButton('Réessayer',()=>renderPurchaseHistory(target,true)));});
   }
+  let keyPage=0;
   function show(tab){
     current=tab;viewport.replaceChildren();
     for(const [id,el] of tabButtons){el.classList.toggle('active',id===tab);el.setAttribute('aria-selected',String(id===tab));el.tabIndex=id===tab?0:-1;}viewport.setAttribute('aria-labelledby','account-tab-'+tab);
     if(tab==='access'){
-      if(!overview){const head=block('div',undefined,'account-section-head');const title=block('div');title.append(block('span','ESPACE PERSONNEL','account-eyebrow'),block('h2','Mes clés'),block('p','Retrouve les clés associées à tes commandes.','client-quiet'));head.append(title);const preview=block('div',undefined,'account-key-card account-skeleton-key');preview.setAttribute('aria-hidden','true');preview.append(block('div',undefined,'account-skeleton-bar'),block('div',undefined,'account-skeleton-bar'));viewport.append(head,preview);return;}
+      const head=block('div',undefined,'account-section-head account-keys-heading');
+      head.append(accountHeading('Mes clés','Retrouve les clés associées à tes achats.'));
+      const controls=block('div',undefined,'account-keys-toolbar');
+      const refreshButton=smallButton('Actualiser',()=>refresh(true),'btn ghost account-keys-refresh');refreshButton.setAttribute('aria-label','Actualiser mes accès');
+      controls.append(refreshButton);head.append(controls);viewport.append(head);
+      if(!overview){const preview=block('div',undefined,'account-key-card account-skeleton-key');preview.setAttribute('aria-hidden','true');preview.append(block('div',undefined,'account-skeleton-bar'),block('div',undefined,'account-skeleton-bar'));viewport.append(preview);return;}
       const display={day:'Pass Jour',week:'Pass Semaine',month:'Pass Mois',life:'Pass Lifetime'};
-      const active=purchases.filter(p=>p.active);
-      const head=block('div',undefined,'account-section-head');
-      const title=block('div');title.append(block('span','ESPACE PERSONNEL','account-eyebrow'),block('h2','Mes clés'),block('p','Retrouve les clés associées à tes commandes.','client-quiet'));
-      head.append(title,smallButton('Actualiser mes accès',()=>refresh(true)));
-      viewport.append(head);
-      const metrics=block('div',undefined,'account-metrics');
-      for(const [n,label] of [[active.filter(p=>p.keyAvailable).length+(overview.legacyKeyAvailable?1:0),'Clés disponibles'],[active.filter(p=>p.waitingStock).length,'En attente de stock'],[purchases.length,'Pass achetés']]){
-        const tile=block('div',undefined,'account-metric');tile.append(block('strong',String(n)),block('span',label));metrics.append(tile);
+      const entries=[...purchases].sort((a,b)=>(Date.parse(b.purchaseDate)||0)-(Date.parse(a.purchaseDate)||0)||a.paymentId.localeCompare(b.paymentId));
+      if(overview.legacyKeyAvailable)entries.push({paymentId:'legacy',keyAvailable:true,legacy:true});
+      const total=entries.length,pageCount=Math.max(1,Math.ceil(total/4));
+      keyPage=Math.min(keyPage,pageCount-1);
+      if(total>=4){
+        const nav=block('div',undefined,'account-keys-pagination');
+        const previous=button('‹',()=>{if(keyPage>0){keyPage--;show('access');document.getElementById('keys-prev')?.focus();}},'account-key-arrow');
+        const next=button('›',()=>{if(keyPage+1<pageCount){keyPage++;show('access');document.getElementById('keys-next')?.focus();}},'account-key-arrow');
+        previous.id='keys-prev';next.id='keys-next';previous.setAttribute('aria-label','Clés précédentes');next.setAttribute('aria-label','Clés suivantes');previous.disabled=keyPage===0;next.disabled=keyPage+1>=pageCount;
+        const page=block('span',(keyPage+1)+' / '+pageCount,'account-key-page-count');page.setAttribute('aria-live','polite');nav.append(previous,page,next);controls.append(nav);
       }
-      viewport.append(metrics);
-      if(!purchases.length&&!overview.legacyKeyAvailable){
-        const empty=block('div',undefined,'account-empty');empty.append(block('span','◇','account-empty-icon'),block('h3','Aucune clé pour le moment'),block('p','Tes clés apparaîtront ici après confirmation de ton achat.'),link('Découvrir les offres','/offres','btn client-button-primary'));viewport.append(empty);return;
+      if(!total){
+        const empty=block('div',undefined,'account-empty');empty.append(block('h3','Aucune clé pour le moment'),block('p','Tes clés apparaîtront ici après confirmation de ton achat.'),link('Découvrir les offres','/offres','btn client-button-primary'));viewport.append(empty);return;
       }
-      const list=block('div',undefined,'account-key-list');
+      const list=block('div',undefined,'account-key-list account-key-list-compact');
       function keyControls(card,paymentId){
         const query='?payment='+encodeURIComponent(paymentId);
         const input=block('input');input.type='text';input.readOnly=true;input.value='•••• •••• ••••';input.className='portal-key-input';input.setAttribute('aria-label','Clé de licence');input.autocomplete='off';input.spellcheck=false;
-        const getKey=async()=>{const r=await fetch('/api/account/key'+query,{cache:'no-store'});if(!r.ok)throw Error();return (await r.json()).key;};
+        const getKey=async()=>{const r=await fetch('/api/account/key'+query,{cache:'no-store'});if(!r.ok)throw Error();const data=await r.json();if(typeof data.key!=='string'||!data.key)throw Error();return data.key;};
         const actions=block('div',undefined,'portal-key-actions');let revealed=false;
-        const reveal=smallButton('Afficher',async()=>{try{if(revealed){input.value='•••• •••• ••••';revealed=false;reveal.textContent='Afficher';return;}reveal.disabled=true;const value=await getKey();if(!input.isConnected)return;input.value=value;revealed=true;reveal.textContent='Masquer';}catch{status('Clé indisponible.');}finally{reveal.disabled=false;}});
-        actions.append(reveal,smallButton('Copier',async()=>{try{await navigator.clipboard.writeText(await getKey());status('Clé copiée.');}catch{status('Copie indisponible.');}},'btn client-button-primary'),link('Fichier .txt','/api/account/key.txt'+query,'btn ghost portal-action'));
+        const reveal=smallButton('Afficher',async()=>{try{if(revealed){input.value='•••• •••• ••••';revealed=false;reveal.textContent='Afficher';return;}reveal.disabled=true;const value=await getKey();if(!input.isConnected)return;input.value=value;revealed=true;reveal.textContent='Masquer';}catch{status('Clé indisponible.');}finally{reveal.disabled=false;}},'btn ghost account-key-action');
+        const copy=smallButton('Copier',async()=>{try{await navigator.clipboard.writeText(await getKey());if(input.isConnected)status('Clé copiée.');}catch{status('Copie indisponible.');}},'btn ghost account-key-action');
+        const download=link('Télécharger','/api/account/key.txt'+query,'btn ghost portal-action account-key-action');download.download='BRO-cle.txt';download.setAttribute('aria-label','Télécharger la clé au format TXT');
+        actions.append(reveal,copy,download);
         const field=block('div',undefined,'account-key-field');field.append(input,actions);card.append(field);
       }
-      for(const purchase of [...purchases].sort((a,b)=>Number(b.active)-Number(a.active))){
+      for(const purchase of entries.slice(keyPage*4,keyPage*4+4)){
         const card=block('article',undefined,'account-key-card');
         const top=block('div',undefined,'account-key-top'),identity=block('div',undefined,'account-key-identity');
-        const img=block('img');img.src='/assets/robrun.jpg';img.alt='';img.loading='lazy';
-        const name=block('div');name.append(block('small','ROB RUN'),block('h3',display[purchase.planId]||'Pass'));identity.append(img,name);
-        const state=purchase.keyAvailable?'Clé disponible':purchase.waitingStock?'En attente de stock':purchase.active?'Livraison à vérifier':'Accès Discord terminé';
-        const pill=block('span',state,'account-key-state '+(purchase.keyAvailable?'is-ready':purchase.active?'is-waiting':'is-ended'));top.append(identity,pill);card.append(top);
+        const img=block('img');img.src='/assets/robrunkey.webp';img.alt='';img.width=32;img.height=32;img.loading='lazy';
+        const name=block('div',undefined,'account-key-name');
+        const date=purchase.purchaseDate&&Number.isFinite(Date.parse(purchase.purchaseDate))?new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeZone:'Europe/Paris'}).format(new Date(purchase.purchaseDate)):null;
+        name.append(block('h3',purchase.legacy?'Clé historique':display[purchase.planId]||'Pass'),block('small',date?'Acheté le '+date:'Date d’achat non disponible'));
+        identity.append(img,name);top.append(identity,block('span',purchase.legacy?'Clé historique':'Acheté','account-key-state is-ready'));card.append(top);
         if(purchase.keyAvailable){
           keyControls(card,purchase.paymentId);
-        }else card.append(block('p',purchase.waitingStock?'Commande confirmée. Ta clé sera attribuée dès que le stock correspondant sera disponible.':purchase.active?'Commande confirmée. Contacte le support si ta clé reste indisponible.':'Retrouve la référence de cette commande dans Mes achats.','client-quiet'));
-        const meta=block('div',undefined,'account-key-meta');
-        meta.append(block('span',purchase.expiresAt?'Accès Discord : '+new Date(purchase.expiresAt).toLocaleString('fr-FR'):'Accès Discord à vie'),block('span','Activation de la licence : non synchronisée'));
-        card.append(meta);list.append(card);
+        }else{
+          card.append(block('p',purchase.waitingStock?'En attente de stock — attribution automatique dès le réapprovisionnement.':'Clé non disponible dans cet espace.','account-key-delivery'));
+        }
+        list.append(card);
       }
-      if(overview.legacyKeyAvailable){const old=block('article',undefined,'account-key-card');old.append(block('h3','Clé historique'));keyControls(old,'legacy');list.append(old);}
       viewport.append(list);
-      if(active.length){const launcherNotice=block('p','Pour télécharger le launcher, c’est ','client-quiet');const launcherLink=link('ici','https://discord.com/channels/1448897452404117558/1574774596706508821');launcherLink.style.textDecoration='underline';launcherLink.target='_blank';launcherLink.rel='noopener noreferrer';launcherNotice.append(launcherLink,'.');viewport.append(launcherNotice);}
+      // A purchase date is not a license activation date. No inferred expiry or live license status is shown.
+      const summary=block('div',undefined,'account-keys-summary');
+      summary.append(block('span',total+' '+(total===1?'élément':'éléments')+' · '+Math.min(total,keyPage*4+1)+'–'+Math.min(total,keyPage*4+4),'client-quiet'));
+      if(purchases.some(p=>p.active)){const launcherLink=link('Télécharger le launcher','https://discord.com/channels/1448897452404117558/1574774596706508821','account-key-launcher');launcherLink.target='_blank';launcherLink.rel='noopener noreferrer';summary.append(launcherLink);}
+      viewport.append(summary);
     }else if(tab==='orders'){
       const head=block('div',undefined,'account-section-head');
       const refreshHistory=smallButton('Actualiser',()=>{purchaseHistory=null;renderPurchaseHistory(historyTarget,true);refresh(true);},'btn ghost account-history-refresh');refreshHistory.setAttribute('aria-label','Actualiser mes achats');head.append(accountHeading('Mes achats','Retrouve tes commandes et leurs justificatifs.'),refreshHistory);
