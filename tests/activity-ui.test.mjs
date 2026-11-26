@@ -99,7 +99,7 @@ test('public site contains accessible five-purchase board; account has no e-mail
  assert.match(css,/#modal\.client-portal-compact/);
  assert.match(css,/overflow:hidden!important/);
  assert.match(js,/if\(purchase\.keyAvailable\)/);
- assert.match(js,/encodeURIComponent\(purchase\.paymentId\)/);
+ assert.match(js,/encodeURIComponent\(paymentId\)/);assert.match(js,/keyControls\(card,purchase\.paymentId\)/);
 });
 
 test('a verified order can upgrade a pre-imported anonymous purchase without changing its payment',async()=>{

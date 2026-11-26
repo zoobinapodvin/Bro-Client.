@@ -116,7 +116,7 @@ async function account(){
   if(!body){location.assign('/espace-client');return;}
   if(modal.open)modal.close();
   body.replaceChildren();
-  body.setAttribute('aria-busy','false');
+  body.setAttribute('aria-busy',String(!accountReady&&!!sessionRequest));
   const notice=block('p','','client-status-message');
   notice.setAttribute('role','status');
   if(!accountReady&&sessionRequest){
