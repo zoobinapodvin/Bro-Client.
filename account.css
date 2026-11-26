@@ -136,3 +136,42 @@
 .account-page .account-support-action{width:auto;min-height:40px;font-size:.78rem;white-space:nowrap;padding:8px 12px}
 @media(max-width:760px){.account-setting-row{padding:12px;gap:10px;min-height:68px}.account-setting-copy strong{font-size:.84rem}.account-setting-copy p{font-size:.75rem}.account-page .account-setting-action{min-width:64px;min-height:44px;font-size:.72rem;padding:7px 9px!important}.account-guide-row{gap:12px;min-height:56px;padding:6px 0}.account-guide-title{font-size:.85rem}.account-guide-link{min-height:44px;min-width:58px;padding:5px 9px;font-size:.76rem}.account-support-card{grid-template-columns:40px minmax(0,1fr);padding:13px;gap:11px}.account-support-icon{width:40px;height:40px}.account-page .account-support-action{grid-column:1/-1;min-height:44px;justify-content:center;width:100%}.account-tab-heading h2{font-size:1.35rem}.account-tab-heading p{font-size:.8rem}}
 @media(prefers-reduced-motion:reduce){.account-switch-track,.account-switch-track:after,.account-guide-link{transition:none}}
+
+/* Purchase history — flat transaction rows and private receipt preview. */
+.account-history{min-width:0;display:flex;flex-direction:column;gap:0}
+.account-history-row{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr) minmax(70px,.6fr) 88px;align-items:center;gap:14px;padding:17px 4px;border-bottom:1px solid #344355;min-width:0}
+.account-history-labels{padding:8px 4px;color:#9db0c5;font-size:.73rem;font-weight:650}
+.account-history-product{display:flex;flex-direction:column;gap:5px;min-width:0}
+.account-history-product strong{color:#edf3fb;font-size:.89rem;line-height:1.4}
+.account-history-product small{color:#91a4ba;font-size:.68rem;overflow-wrap:anywhere}
+.account-history-date{font-size:.8rem;color:#b0bed0;line-height:1.4}
+.account-history-amount{font-size:.87rem;color:#eef3fa;font-variant-numeric:tabular-nums}
+.account-invoice-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;width:fit-content;justify-self:end;border:1px solid #40536a;border-radius:7px;padding:6px 11px;background:transparent;color:#b4c8e0;font-size:.77rem;font-weight:650;cursor:pointer}
+.account-invoice-button:hover{background:#28384c;border-color:#8ba8c5;color:#fff}
+.account-invoice-button:focus-visible{outline:2px solid #b4c8e0;outline-offset:3px}
+.account-history-missing{font-size:.68rem;color:#a6b4c4;overflow-wrap:anywhere}
+.account-page .account-history-refresh{width:auto;flex-shrink:0;min-height:36px;font-size:.78rem}
+#modal.purchase-invoice-dialog{width:min(94vw,660px);padding:20px;border-color:#3c4d61;background:#192330;max-height:92dvh}
+#modal.purchase-invoice-dialog .modal-top{margin-bottom:12px}
+#modal.purchase-invoice-dialog #dialogTitle{font-size:1.15rem;letter-spacing:-.02em;margin:0 0 14px}
+.bro-invoice-paper{background:#f9fafc;border-radius:10px;padding:26px;color:#182230;display:grid;gap:22px;min-width:0}
+.bro-invoice-banner{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;border-bottom:2px solid #23394d;padding-bottom:20px}
+.bro-invoice-banner>div{display:flex;flex-direction:column;gap:6px;min-width:0}
+.bro-invoice-banner>div:last-child{text-align:right}
+.bro-invoice-brand strong{font-size:2.2rem;letter-spacing:-.1em;line-height:1}
+.bro-invoice-banner>div:last-child strong{font-size:.85rem;color:#263b50;letter-spacing:.05em}
+.bro-invoice-banner span{font-size:.72rem;color:#506174}
+.bro-invoice-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bro-invoice-meta>div{display:grid;gap:4px;min-width:0}
+.bro-invoice-meta span{font-size:.72rem;color:#617184}
+.bro-invoice-meta strong{font-size:.82rem;overflow-wrap:anywhere;color:#202e3d}
+.bro-invoice-line{display:grid;grid-template-columns:minmax(0,1fr) 36px minmax(75px,auto);gap:10px;padding:12px 8px;font-size:.82rem;align-items:center}
+.bro-invoice-line>:last-child{text-align:right}
+.bro-invoice-line-head{background:#e8eef5;font-size:.72rem;font-weight:700;color:#45566a;border-radius:5px}
+.bro-invoice-line+.bro-invoice-line{border-bottom:1px solid #d6dee8}
+.bro-invoice-total{display:flex;justify-content:space-between;align-items:center;gap:12px;border-radius:7px;background:#e7eef7;padding:14px 12px;font-size:.82rem}
+.bro-invoice-total strong{font-size:1.25rem;color:#1c354e;white-space:nowrap}
+#modal .bro-invoice-disclaimer{font-size:.72rem;line-height:1.5;color:#58697b;margin:0}
+.bro-invoice-actions{display:flex;justify-content:flex-end;margin-top:16px}
+.bro-invoice-actions .btn{min-height:40px;font-size:.83rem}
+@media(max-width:760px){.account-history-labels{display:none}.account-history-row{grid-template-columns:minmax(0,1fr) auto;gap:7px 10px;padding:13px 0}.account-history-product{grid-column:1;grid-row:1}.account-history-date{grid-column:1;grid-row:2;font-size:.75rem}.account-history-amount{grid-column:2;grid-row:1;text-align:right}.account-invoice-button,.account-history-missing{grid-column:2;grid-row:2;justify-self:end}.account-invoice-button{min-height:44px;padding:8px 10px}.account-page .account-history-refresh{min-height:44px}#modal.purchase-invoice-dialog{padding:13px;width:calc(100vw - 18px)}.bro-invoice-paper{padding:17px;gap:17px}.bro-invoice-banner{gap:10px}.bro-invoice-meta{grid-template-columns:1fr;gap:10px}.bro-invoice-line{font-size:.76rem;gap:7px;padding:10px 5px}.bro-invoice-actions .btn{min-height:44px;width:100%}}

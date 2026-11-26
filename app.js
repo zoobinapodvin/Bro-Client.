@@ -71,7 +71,7 @@ function render(){
   window.dispatchEvent(new Event('bro-home-render'));
 }
 function openDialog(title) {
-  modal.classList.remove('editing','client-portal','client-portal-compact');body.classList.remove('client-portal-body');body.replaceChildren();
+  modal.classList.remove('editing','client-portal','client-portal-compact','purchase-invoice-dialog');body.classList.remove('client-portal-body');body.replaceChildren();
   const heading=block('h2',title);heading.id='dialogTitle';body.append(heading);modal.setAttribute('aria-labelledby','dialogTitle');
   if(!modal.open)modal.showModal();modal.scrollTop=0;
 }
@@ -233,6 +233,7 @@ async function account(){
       const signature=JSON.stringify(next),changed=signature!==overviewSignature;
       overview=next;overviewSignature=signature;
       purchases=overview.purchases||[];
+      if(changed){historyRevision++;purchaseHistory=null;purchaseHistoryRequest=null;}
       const previousGuideAccess=user?.guideAccess;
       if(user){user.guideAccess=overview.hasPurchase===true;syncGuideNavigation();}
       if(changed&&(current==='access'||current==='orders'||(current==='help'&&previousGuideAccess!==user?.guideAccess)))show(current);
@@ -316,6 +317,84 @@ async function account(){
     }
     guideRequest.then(()=>renderGuideIndex(target)).catch(()=>{if(target.isConnected&&current==='help')target.replaceChildren(block('p','Guides momentanément indisponibles.','client-quiet'),smallButton('Réessayer',()=>renderGuideIndex(target)));});
   }
+  let purchaseHistory=null,purchaseHistoryRequest=null,historyRevision=0;
+  function purchaseAmount(record){
+    try{return new Intl.NumberFormat('fr-FR',{style:'currency',currency:record.currency}).format(record.amount);}catch{return String(record.amount)+' '+record.currency;}
+  }
+  function purchaseDate(record){
+    return new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Paris'}).format(new Date(record.date));
+  }
+  function invoiceModal(record){
+    if(!user||!/^pay_[A-Za-z0-9]+$/.test(record.id))return;
+    openDialog('Justificatif d’achat');modal.classList.add('purchase-invoice-dialog');
+    const paper=block('article',undefined,'bro-invoice-paper');
+    const banner=block('div',undefined,'bro-invoice-banner'),brand=block('div',undefined,'bro-invoice-brand');
+    brand.append(block('strong','BRO.'),block('span','BRO CLIENT · broclient.com'));
+    const heading=block('div');heading.append(block('strong','JUSTIFICATIF D’ACHAT'),block('span',purchaseDate(record)));
+    banner.append(brand,heading);paper.append(banner);
+    const meta=block('div',undefined,'bro-invoice-meta');
+    for(const [label,value] of [['Compte client',user.username||user.discordUsername||'Compte BRO'],['Référence de transaction',record.reference],['Traitement du paiement',record.provider==='tebex'?'Tebex':record.provider==='whop'?'Whop':'Prestataire de paiement']]){
+      const field=block('div');field.append(block('span',label),block('strong',value));meta.append(field);
+    }
+    paper.append(meta);
+    const items=block('div',undefined,'bro-invoice-items');
+    const lineHead=block('div',undefined,'bro-invoice-line bro-invoice-line-head');lineHead.append(block('span','Service acheté'),block('span','Qté'),block('span','Montant'));
+    const line=block('div',undefined,'bro-invoice-line');line.append(block('strong',record.title),block('span','1'),block('strong',purchaseAmount(record)));
+    items.append(lineHead,line);paper.append(items);
+    const total=block('div',undefined,'bro-invoice-total');total.append(block('span','Montant de la transaction'),block('strong',purchaseAmount(record)));paper.append(total);
+    paper.append(block('p','Ce document récapitule la transaction enregistrée sur BRO CLIENT. Il ne remplace pas la facture fiscale du vendeur légal. Le détail des taxes et les remboursements éventuels ne sont pas attestés par ce document.','bro-invoice-disclaimer'));
+    const actions=block('div',undefined,'bro-invoice-actions');
+    const download=link('Télécharger le PDF','/api/invoices/'+encodeURIComponent(record.id)+'/receipt.pdf','btn client-button-primary');download.download='BRO-achat-'+record.id+'.pdf';
+    actions.append(download);bodyGlobal().append(paper,actions);
+  }
+  // The account body is local to account(); the shared dialog uses its own DOM node.
+  function bodyGlobal(){return document.getElementById('modalBody');}
+  function renderPurchaseHistory(target,force=false){
+    if(!target.isConnected||current!=='orders')return;
+    if(force){historyRevision++;purchaseHistoryRequest=null;purchaseHistory=null;}
+    if(purchaseHistory){
+      target.replaceChildren();
+      const records=purchaseHistory,known=new Set(records.map(r=>r.id));
+      const missing=purchases.filter(p=>!known.has(p.paymentId));
+      if(!records.length&&!missing.length){const empty=block('div',undefined,'account-empty');empty.append(block('h3','Aucun achat pour le moment'),block('p','Tes achats confirmés apparaîtront ici.'));target.append(empty);return;}
+      const header=block('div',undefined,'account-history-row account-history-labels');for(const name of ['Service','Date','Montant','Document'])header.append(block('span',name));target.append(header);
+      for(const record of records){
+        const row=block('div',undefined,'account-history-row');
+        const product=block('div',undefined,'account-history-product');product.append(block('strong',record.title),block('small',record.reference));
+        const date=block('span',purchaseDate(record),'account-history-date'),amount=block('strong',purchaseAmount(record),'account-history-amount');
+        const action=button('Invoice',()=>invoiceModal(record),'account-invoice-button');action.setAttribute('aria-label','Voir le justificatif de '+record.title+' · '+record.reference);
+        row.append(product,date,amount,action);target.append(row);
+      }
+      for(const p of missing){
+        const names={day:'Pass Jour',week:'Pass Semaine',month:'Pass Mois',life:'Pass Lifetime'};
+        const row=block('div',undefined,'account-history-row');
+        const product=block('div',undefined,'account-history-product');product.append(block('strong',names[p.planId]||'Pass'),block('small',p.paymentId));
+        row.append(product,block('span','Non disponible','account-history-date'),block('span','—','account-history-amount'),block('span','Justificatif indisponible','account-history-missing'));target.append(row);
+      }
+      return;
+    }
+    target.replaceChildren(block('p','Récupération de tes achats…','client-quiet'));
+    if(!purchaseHistoryRequest){
+      const revision=historyRevision,epoch=sessionEpoch;
+      const request=(async()=>{
+        const records=new Map(),seen=new Set();let cursor=null;
+        do{
+          const r=await fetch('/api/invoices'+(cursor?'?cursor='+encodeURIComponent(cursor):''),{cache:'no-store',signal:AbortSignal.timeout(12000)});
+          if(!r.ok)throw Error('history');
+          const result=await r.json();if(!Array.isArray(result.invoices))throw Error('history');
+          for(const record of result.invoices){
+            if(!/^pay_[A-Za-z0-9]+$/.test(record.id)||typeof record.title!=='string'||!Number.isFinite(Date.parse(record.date))||typeof record.amount!=='number'||!Number.isFinite(record.amount)||record.amount<0||!/^[A-Z]{3}$/.test(record.currency)||typeof record.reference!=='string')continue;
+            records.set(record.id,record);
+          }
+          cursor=result.nextCursor||null;if(cursor&&seen.has(cursor))throw Error('history_cursor');if(cursor)seen.add(cursor);
+        }while(cursor);
+        if(epoch!==sessionEpoch||revision!==historyRevision||!user)throw Error('history_session');
+        purchaseHistory=[...records.values()].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));
+      })();
+      purchaseHistoryRequest=request;request.finally(()=>{if(purchaseHistoryRequest===request)purchaseHistoryRequest=null;}).catch(()=>{});
+    }
+    purchaseHistoryRequest.then(()=>renderPurchaseHistory(target)).catch(()=>{if(target.isConnected&&current==='orders'&&!purchaseHistoryRequest)target.replaceChildren(block('p','Historique momentanément indisponible.','client-quiet'),smallButton('Réessayer',()=>renderPurchaseHistory(target,true)));});
+  }
   function show(tab){
     current=tab;viewport.replaceChildren();
     for(const [id,el] of tabButtons){el.classList.toggle('active',id===tab);el.setAttribute('aria-selected',String(id===tab));el.tabIndex=id===tab?0:-1;}viewport.setAttribute('aria-labelledby','account-tab-'+tab);
@@ -363,31 +442,10 @@ async function account(){
       viewport.append(list);
       if(active.length){const launcherNotice=block('p','Pour télécharger le launcher, c’est ','client-quiet');const launcherLink=link('ici','https://discord.com/channels/1448897452404117558/1574774596706508821');launcherLink.style.textDecoration='underline';launcherLink.target='_blank';launcherLink.rel='noopener noreferrer';launcherNotice.append(launcherLink,'.');viewport.append(launcherNotice);}
     }else if(tab==='orders'){
-      const header=block('div',undefined,'portal-orders-heading');
-      header.append(block('strong','Historique des achats'));
-      header.append(smallButton('Actualiser mes achats',()=>refresh(true),'btn client-button-primary'));
-      viewport.append(header);
-      if(!purchases.length){
-        viewport.append(block('p','Ton historique sera affiché après un achat associé à ton compte.','client-quiet'));
-      }else{
-        for(const item of purchases){
-          const row=block('div',undefined,'portal-order-item');
-          const names={day:'Jour',week:'Semaine',month:'Mois',life:'Lifetime'};
-          row.append(block('strong','Bro Client · '+(names[item.planId]||'Pass')),
-            block('span',item.active?'Accès Discord actif':'Accès Discord terminé',item.active?'client-tag-active':'client-tag-expired'));
-          viewport.append(row);
-        }
-      }
-      const invoices=block('details');
-      invoices.append(block('summary','Factures et assistance par achat'));
-      invoices.addEventListener('toggle',()=>{
-        if(invoices.open&&!invoices.dataset.loaded){
-          invoices.dataset.loaded='true';loadInvoices(invoices);
-        }
-      });
-      viewport.append(invoices);
-      const ordersLink=link('Ouvrir mes factures Whop','https://whop.com/@me/settings/orders/','portal-small-link');
-      ordersLink.target='_blank';ordersLink.rel='noopener noreferrer';viewport.append(ordersLink);
+      const head=block('div',undefined,'account-section-head');
+      head.append(accountHeading('Mes achats','Retrouve tes commandes et leurs justificatifs.'),smallButton('Actualiser',()=>{purchaseHistory=null;renderPurchaseHistory(historyTarget,true);refresh(true);},'btn ghost account-history-refresh'));
+      const historyTarget=block('div',undefined,'account-history');viewport.append(head,historyTarget);
+      renderPurchaseHistory(historyTarget);
     }else if(tab==='help'){
       viewport.append(accountHeading('Guides','Retrouve la documentation et l’assistance BRO.'));
       if(user.guideAccess===true){
@@ -469,35 +527,6 @@ async function account(){
   if(!overview)refresh();
   // Whop can redirect before the signed webhook arrives. Poll briefly only on a return to the account.
   if($('#accountPage')){let tries=0;const timer=setInterval(()=>{if(!viewport.isConnected||++tries>12){clearInterval(timer);return;}refresh();},5000);}
-}
-async function loadInvoices(target,cursor) {
-  const note=block('p','Chargement des paiements…');target.append(note);
-  try{
-    const response=await fetch('/api/invoices'+(cursor?'?cursor='+encodeURIComponent(cursor):''));
-    if(!response.ok)throw Error();
-    const data=await response.json();note.remove();
-    if(data.mode!=='synced'){target.append(block('p','Tes factures sont disponibles dans le portail Whop avec le compte utilisé pour ton achat.'));return;}
-    if(!data.invoices?.length&&!cursor)target.append(block('p','Aucun paiement à afficher pour le moment.'));
-    for(const invoice of data.invoices||[]){
-      const row=block('div',undefined,'invoice');row.append(block('strong',invoice.title||'Paiement'));
-      const date=new Date(invoice.date);
-      const amount=new Intl.NumberFormat('fr-FR',{style:'currency',currency:invoice.currency||'EUR'}).format(invoice.amount);
-      row.append(block('p',[Number.isNaN(date.valueOf())?'':date.toLocaleDateString('fr-FR'),amount].filter(Boolean).join(' · ')));
-      if(/^pay_[A-Za-z0-9]+$/.test(invoice.id)){
-        const reference=invoice.provider==='tebex'?invoice.transactionId:invoice.id;
-        const ref=block('p',(invoice.provider==='tebex'?'Référence Tebex · ':'Référence Whop · ')+reference);
-        const copy=button('Copier la référence',async()=>{
-          try{await navigator.clipboard.writeText(reference);copy.textContent='Référence copiée';}
-          catch{ref.textContent='Référence à copier : '+reference;}
-        });
-        const support=link('Contacter le vendeur','/informations.html#assistance','portal-small-link');
-        support.target='_blank';support.rel='noopener noreferrer';
-        row.append(ref,copy,support);
-      }
-      if(invoice.pdfUrl==='/api/invoices/'+invoice.id+'/pdf'){const pdf=link('Voir la facture',invoice.pdfUrl);pdf.target='_blank';pdf.rel='noopener noreferrer';row.append(pdf);}target.append(row);
-    }
-    if(data.nextCursor){const more=button('Voir les paiements précédents',()=>{more.remove();loadInvoices(target,data.nextCursor);});target.append(more);}
-  }catch{if(!note.isConnected)target.append(note);note.textContent='Le relevé est temporairement indisponible. Tes achats restent accessibles sur Whop.';}
 }
 const labels={
  legalIdentity:'Identité et statut juridique',legalAddress:'Adresse professionnelle',legalRegistration:'Immatriculation et TVA',legalDirector:'Responsable de publication',legalContact:'E-mail public',legalPhone:'Téléphone professionnel',legalMediator:'Nom, adresse et site du médiateur',brand:'Nom de marque',brandLogo:'Logo',heroImage:'Illustration de l’accueil',navHome:'Lien Accueil',navPlans:'Lien Tarifs',navFeatures:'Lien Fonctionnalités',navFaq:'Lien FAQ',accountLabel:'Espace client',

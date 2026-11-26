@@ -327,7 +327,11 @@ export default async function handler(req,res) {
     }
     const url=new URL(path,origin);if(parsed.searchParams.has('cursor'))url.searchParams.set('cursor',parsed.searchParams.get('cursor'));
     const request=new Request(url,{method:req.method,headers:req.headers,body:payload});
-    const invoice=await handleBilling(request,billingEnv,user?.id??null);if(invoice)return await respond(res,invoice);
+    let receiptCustomer;
+    if(user&&/^\/api\/invoices\/pay_[A-Za-z0-9]{1,160}\/receipt\.pdf$/.test(path)){
+      try{receiptCustomer=(await readAccount(bucket,user.discordId))?.username||user.discordUsername;}catch{receiptCustomer=user.discordUsername;}
+    }
+    const invoice=await handleBilling(request,billingEnv,user?.id??null,receiptCustomer);if(invoice)return await respond(res,invoice);
     if((path==='/api/site'||path==='/api/media')&&req.method==='POST'){
       if(!canEditHomepage(user))return res.status(403).json({error:'Accès administrateur requis.'});
       if(path==='/api/site'&&!req.headers['if-match'])return res.status(428).json({error:'Recharge la page avant de modifier le site.'});
