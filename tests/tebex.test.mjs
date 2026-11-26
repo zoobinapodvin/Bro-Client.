@@ -30,7 +30,7 @@ test('Tebex delivers exactly one correct key, keeps Whop history, and is replay 
   assert.equal(await readCustomerKey(b,'1574096900000000002',row.paymentId),null);
   const activity=await recentPurchases(b);assert.equal(activity.length,2);
   assert.equal(activity[0].planId,plan);assert.equal(activity[1].amount,6);
-  const storedInvoice=await (await b.get('private/invoices/'+owner+'/'+row.paymentId)).json();assert.match(storedInvoice.broReference,/^bro-\d{24}$/);assert.equal(storedInvoice.transactionId,event.subject.transaction_id);
+  const storedInvoice=await (await b.get('private/invoices/'+owner+'/'+row.paymentId)).json();assert.match(storedInvoice.broReference,/^bro-\d{24}$/);assert.equal(storedInvoice.transactionId,e.subject.transaction_id);
   const conflict=await completeTebexPayment(b,{...e,subject:{...e.subject,transaction_id:'tbx-second-transaction'}},deps);assert.equal(conflict.status,409);
   assert.equal((await stockOverview(b)).counts[plan].available,1);
  }
