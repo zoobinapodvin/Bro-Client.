@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {completeTebexPayment,verifyTebexBasket} from '../lib/tebex.mjs';
+import {completeTebexPayment,verifyTebexBasket,recoverConfiguredTebexPayment,fetchTebexPayment} from '../lib/tebex.mjs';
 import {addStockKey,readCustomerKey,stockOverview} from '../lib/fulfillment.mjs';
 import {recentPurchases,storeActivity} from '../lib/activity.mjs';
 const discordId='1574096900000000001',owner='a'.repeat(64),ref='01234567-1234-1234-1234-0123456789ab',ownerId='1027596385123565569';
@@ -56,4 +56,46 @@ test('Tebex rejects unrelated products and verifies the completed basket transac
  globalThis.fetch=async()=>Response.json({data:{...response,links:{},packages:[{id:Number(plans.day),in_basket:{quantity:2}}]}});
  await assert.rejects(verifyTebexBasket(o,tx,ref),/products_mismatch/);
 
+});
+
+test('100% Tebex promotions deliver the correct pass, role and notification once; rejects unverified zero totals',async t=>{
+ const old=process.env.BRO_KEY_ENCRYPTION_KEY,pause=process.env.BRO_KEY_DELIVERY_PAUSED;
+ process.env.BRO_KEY_ENCRYPTION_KEY='2'.repeat(64);process.env.BRO_KEY_DELIVERY_PAUSED='false';
+ t.after(()=>{if(old===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=old;if(pause===undefined)delete process.env.BRO_KEY_DELIVERY_PAUSED;else process.env.BRO_KEY_DELIVERY_PAUSED=pause;});
+ for(const plan of Object.keys(plans)){
+  const b=bucket();await setup(b,plan);
+  await addStockKey(b,{planId:plan,key:'PROMO-'+plan+'-KEY',operatorId:ownerId});
+  const other=plan==='day'?'week':'day';await addStockKey(b,{planId:other,key:'WRONG-PASS-KEY',operatorId:ownerId});
+  const event=eventFor(plan);event.subject.price.amount=0;let role=0,notification=0,publicNotice=0;
+  const deps={verifyBasket:async()=>({currency:'EUR',total_price:0}),reconcile:async(_,id)=>{assert.equal(id,discordId);role++;return {status:plan==='life'?'role_granted_lifetime':'role_granted'};},notify:async(_,o,p)=>{assert.equal(o.planId,plan);assert.equal(p.amount_charged.amount,0);notification++;return {ok:true};},publicNotify:async(_,p)=>{assert.equal(p.amount,0);publicNotice++;return {ok:true,configured:true};}};
+  for(const price of [-1,null,'0']){const bad=structuredClone(event);bad.subject.price.amount=price;assert.equal((await completeTebexPayment(b,bad,deps)).status,422);}
+  for(const total of [prices[plan],null,undefined])assert.equal((await completeTebexPayment(b,event,{...deps,verifyBasket:async()=>({currency:'EUR',total_price:total})})).status,422);
+  assert.equal((await completeTebexPayment(b,{...event,subject:{...event.subject,status:{id:0}}},deps)).status,422);
+  assert.equal((await stockOverview(b)).counts[plan].available,1);
+  assert.equal((await completeTebexPayment(b,event,deps)).body.delivery,'assigned');
+  const row=(await stockOverview(b)).rows.find(r=>r.paymentId);
+  assert.equal(await readCustomerKey(b,discordId,row.paymentId),'PROMO-'+plan+'-KEY');
+  assert.equal((await recentPurchases(b))[0].amount,0);
+  assert.equal((await (await b.get('private/invoices/'+owner+'/'+row.paymentId)).json()).amount,0);
+  assert.equal(role,1);assert.equal(notification,1);assert.equal(publicNotice,1);
+  assert.equal((await completeTebexPayment(b,event,deps)).status,200);
+  assert.equal(role,1);assert.equal(publicNotice,1);
+  assert.equal((await stockOverview(b)).counts[other].available,1);
+  assert.equal((await stockOverview(b)).counts[plan].assigned,1);
+  assert.equal((await recoverConfiguredTebexPayment(b,{transactionId:event.subject.transaction_id,fetchPayment:async()=>{throw Error('already done');}})).status,'already_processed');
+ }
+});
+test('configured Tebex recovery fetches the exact completed transaction and cannot trust a different one',async t=>{
+ const b=bucket(),event=eventFor('day');event.subject.price.amount=0;let completed=0;
+ const complete=async(_,e)=>{assert.deepEqual(e.subject,event.subject);completed++;return {status:200,body:{delivery:'assigned'}};};
+ const transactionId=event.subject.transaction_id;
+ assert.equal((await recoverConfiguredTebexPayment(b,{transactionId,fetchPayment:async()=>({...event.subject,transaction_id:'tbx-other-123'}),complete})).status,'unverified_payment');
+ assert.equal((await recoverConfiguredTebexPayment(b,{transactionId,fetchPayment:async()=>({...event.subject,status:{id:0}}),complete})).status,'unverified_payment');
+ assert.equal(completed,0);
+ assert.equal((await recoverConfiguredTebexPayment(b,{transactionId,fetchPayment:async()=>event.subject,complete})).delivery,'assigned');assert.equal(completed,1);
+ const previousFetch=globalThis.fetch,project=process.env.TEBEX_PROJECT_ID,secret=process.env.TEBEX_PRIVATE_KEY;
+ t.after(()=>{globalThis.fetch=previousFetch;if(project===undefined)delete process.env.TEBEX_PROJECT_ID;else process.env.TEBEX_PROJECT_ID=project;if(secret===undefined)delete process.env.TEBEX_PRIVATE_KEY;else process.env.TEBEX_PRIVATE_KEY=secret;});
+ process.env.TEBEX_PROJECT_ID='test-project';process.env.TEBEX_PRIVATE_KEY='test-key';
+ globalThis.fetch=async(url,options)=>{assert.equal(url,'https://checkout.tebex.io/api/payments/'+transactionId+'?type=txn_id');assert.equal(options.headers.Authorization,'Basic '+Buffer.from('test-project:test-key').toString('base64'));return Response.json(event.subject);};
+ assert.deepEqual(await fetchTebexPayment(transactionId),event.subject);
 });

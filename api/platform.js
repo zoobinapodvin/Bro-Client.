@@ -13,7 +13,7 @@ import {accountOverview,readCustomerKey,ownerStockPath,stockOverview,addStockKey
 import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhopHistory,sendHistoricalSummary,rebuildRecentIndex} from '../lib/activity.mjs';
 import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
 import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
-import {completeTebexPayment} from '../lib/tebex.mjs';
+import {completeTebexPayment,recoverConfiguredTebexPayment} from '../lib/tebex.mjs';
 import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides,CUSTOMER_GUIDES_KEY} from '../lib/customer-guides.mjs';
 // Profile persistence must never block authentication or the checkout route.
 async function rememberAccount(user){
@@ -123,6 +123,8 @@ export default async function handler(req,res) {
     if(path==='/api/discord/cron'&&req.method==='GET'){
       const secret=process.env.CRON_SECRET;
       if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();
+      let tebexRecovery=null;
+      if(process.env.BRO_TEBEX_RECOVERY_TX)try{tebexRecovery=await recoverConfiguredTebexPayment(bucket);console.info('Tebex configured recovery',tebexRecovery);}catch(error){console.error('Tebex configured recovery failed',error?.name);}
       const roles=await reconcileExpiredRoles(bucket);
       let notifications=null;
       try{await backfillWhopHistory(bucket,{apiKey:billingEnv.WHOP_API_KEY,accountId:billingEnv.WHOP_ACCOUNT_ID,maxPages:2});await rebuildRecentIndex(bucket);}catch(error){console.error('Activity background refresh failed',error?.name);}
@@ -132,7 +134,7 @@ export default async function handler(req,res) {
           date:'twoDays',limit:24,onVerifiedPayment:payment=>recoverAttributedPayment(billingEnv,payment)
         });
       }catch(error){console.error('Discord purchase recovery failed',error?.name);}
-      return res.json({roles,notifications});
+      return res.json({roles,notifications,tebexRecovery});
     }
     if(path==='/auth/unlink'&&req.method==='POST')return disconnectDiscord(req,res);
     if(path==='/auth/discord'&&req.method==='POST')return startDiscord(res,new URLSearchParams(payload.toString()).get('return_to'));
