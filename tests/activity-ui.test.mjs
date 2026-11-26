@@ -273,7 +273,7 @@ test('Tebex purchases show the real Discord profile on explicit opt-in and respe
  await setActivityPreference(b,{discordId},false);
  [row]=await recentPurchases(b);assert.equal(row.name,'Client BRO');assert.equal(row.avatar,null);
  const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
- assert.ok(js.includes("viewport.append(profileVisibilitySetting());\n      viewport.append(smallButton('Actualiser mes accès'"));
+ assert.ok(js.includes("profileVisibilitySetting()"));assert.ok(js.includes("smallButton('Actualiser mes accès'"));
  assert.ok(js.includes("if(document.querySelector('#purchaseBoard'))refreshRecentBoard();"));
 });
 
@@ -302,3 +302,5 @@ test('new disclosed Tebex purchases display automatically, legacy and private pu
  const api=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
  assert.ok(api.includes("feedParam==='public'||feedParam==='private'"));
 });
+
+test('customer area is a dedicated responsive page with in-page tabs and verified keys',()=>{const html=readFileSync(new URL('../espace-client.html',import.meta.url),'utf8'),js=readFileSync(new URL('../app.js',import.meta.url),'utf8'),css=readFileSync(new URL('../account.css',import.meta.url),'utf8'),config=JSON.parse(readFileSync(new URL('../vercel.json',import.meta.url),'utf8'));assert.match(html,/<main[^>]*account-page-main/);assert.match(html,/id="accountPage"/);assert.match(html,/<header>/);assert.match(html,/<footer>/);assert.match(html,/name="robots" content="noindex,nofollow"/);assert.ok(config.rewrites.some(r=>r.source==='/espace-client'));assert.ok(js.includes("location.assign('/espace-client')"));assert.ok(js.includes("['access','Mes clés']"));assert.ok(js.includes("['settings','Paramètres']"));assert.ok(js.includes("if(purchase.keyAvailable)"));assert.ok(js.includes("keyControls(card,purchase.paymentId)"));assert.match(js,/Activation de la licence : non synchronisée/);assert.match(css,/@media\(max-width:760px\)/);assert.doesNotMatch(js,/localStorage\.setItem\([^\n]*key/i);});

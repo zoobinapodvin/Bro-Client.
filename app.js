@@ -66,7 +66,7 @@ function render(){
     cta.href='/checkout/'+plan.id+'?feed=public';
     card.append(row,title,desc,price,cta); return card;
   }));
-  $('#questions').replaceChildren(...[1,2,3].map(i=>{const el=block('details');const title=block('summary',c['q'+i]),text=block('p',c['a'+i]);title.dataset.homeField='title';text.dataset.homeField='text';el.append(title,text);if(document.querySelector('[data-home-block="faq-heading"],[data-home-block="offer-faq-heading"]')){const wrap=block('div',undefined,'home-faq-item');wrap.dataset.homeBlock=(document.querySelector('.offers')?'offer-faq-':'faq-')+i;wrap.dataset.homeLabel='Question '+i;wrap.append(el);return wrap;}return el;}));
+  $('#questions')?.replaceChildren(...[1,2,3].map(i=>{const el=block('details');const title=block('summary',c['q'+i]),text=block('p',c['a'+i]);title.dataset.homeField='title';text.dataset.homeField='text';el.append(title,text);if(document.querySelector('[data-home-block="faq-heading"],[data-home-block="offer-faq-heading"]')){const wrap=block('div',undefined,'home-faq-item');wrap.dataset.homeBlock=(document.querySelector('.offers')?'offer-faq-':'faq-')+i;wrap.dataset.homeLabel='Question '+i;wrap.append(el);return wrap;}return el;}));
   window.dispatchEvent(new Event('bro-home-render'));
 }
 function openDialog(title) {
@@ -112,14 +112,16 @@ function discordButton(text,href,cls='btn discord-connect'){
   el.prepend(icon);return el;
 }
 async function account(){
-  openDialog('Mon espace BRO.');
-  modal.classList.add('client-portal','client-portal-compact');
-  body.classList.add('client-portal-body');
+  const body=$('#accountPage');
+  if(!body){location.assign('/espace-client');return;}
+  if(modal.open)modal.close();
+  body.replaceChildren();
+  body.setAttribute('aria-busy','false');
   const notice=block('p','','client-status-message');
   notice.setAttribute('role','status');
   if(!accountReady&&sessionRequest){
     body.append(block('p','Vérification de ta session…','client-quiet'));
-    await sessionRequest;if(modal.open&&body.querySelector('#dialogTitle')?.textContent==='Mon espace BRO.')return account();return;
+    await sessionRequest;if(body.isConnected)return account();return;
   }
   if(!accountReady){
     body.append(block('p','Impossible de récupérer ta session.','client-quiet'),
@@ -154,19 +156,24 @@ async function account(){
   identity.append(block('small','CONNECTÉ AVEC DISCORD'),block('strong',user.discordUsername||'Compte Discord'));
   if(user.username)identity.append(block('small','Identifiant : '+user.username));
   profile.append(identity,block('span','Connecté','portal-connected'));
-  body.append(profile);
-  if(user.stockPath&&!user.admin)body.append(link('Gestion privée des clés',user.stockPath,'btn client-button-primary'));
+  const layout=block('div',undefined,'account-layout');
+  const sidebar=block('aside',undefined,'account-sidebar');
+  sidebar.append(profile);
+  const main=block('div',undefined,'account-main');
+  if(user.stockPath&&!user.admin)sidebar.append(link('Gestion privée des clés',user.stockPath,'btn ghost account-stock'));
+  body.append(layout);layout.append(sidebar,main);
 
   const tabs=block('div',undefined,'portal-tabs');tabs.setAttribute('role','tablist');
   const viewport=block('section',undefined,'portal-view');viewport.setAttribute('aria-live','polite');
   const tabButtons=new Map();
   let overview=freshOverview(),purchases=overview?.purchases||[],current='access',refreshing=false,overviewSignature=overview?JSON.stringify(overview):'';
-  for(const [id,label] of [['access','Mes accès'],['orders','Mes achats'],['help','Aide'],...(user.admin?[['admin','Administration']]:[])]){
+  for(const [id,label] of [['access','Mes clés'],['orders','Mes achats'],['help','Assistance'],['settings','Paramètres'],...(user.admin?[['admin','Administration']]:[])]){
     const item=button(label,()=>show(id),'portal-tab');
-    item.setAttribute('role','tab');item.setAttribute('aria-selected','false');
+    item.setAttribute('role','tab');item.id='account-tab-'+id;item.setAttribute('aria-controls','account-panel');item.setAttribute('aria-selected','false');
+    item.addEventListener('keydown',e=>{const entries=[...tabButtons.entries()],index=entries.findIndex(([k])=>k===id);let n;if(e.key==='ArrowRight'||e.key==='ArrowDown')n=(index+1)%entries.length;else if(e.key==='ArrowLeft'||e.key==='ArrowUp')n=(index+entries.length-1)%entries.length;else if(e.key==='Home')n=0;else if(e.key==='End')n=entries.length-1;else return;e.preventDefault();show(entries[n][0]);entries[n][1].focus();});
     tabButtons.set(id,item);tabs.append(item);
   }
-  body.append(tabs,viewport,notice);
+  viewport.id='account-panel';viewport.setAttribute('role','tabpanel');sidebar.append(tabs);main.append(notice,viewport);
 
   const footer=block('div',undefined,'portal-footer');
   footer.append(block('span','BRO. / Espace client','portal-footer-brand'));
@@ -179,7 +186,7 @@ async function account(){
     }catch{notice.textContent='Déconnexion indisponible. Réessaie.';logout.disabled=false;}
   },'portal-logout');
   const discordLogo=block('span',undefined,'discord-brand-icon');discordLogo.innerHTML=discordMark;
-  logout.prepend(discordLogo);footer.append(logout);body.append(footer);
+  logout.prepend(discordLogo);footer.append(logout);sidebar.append(footer);
 
   const status=(text)=>{notice.textContent=text||'';};
   async function refresh(manual=false){
@@ -187,7 +194,7 @@ async function account(){
     try{
       if(manual)status('Actualisation des achats…');
       const next=await requestOverview();
-      if(!viewport.isConnected||!modal.open)return;
+      if(!viewport.isConnected)return;
       const signature=JSON.stringify(next),changed=signature!==overviewSignature;
       overview=next;overviewSignature=signature;
       purchases=overview.purchases||[];
@@ -236,58 +243,50 @@ async function account(){
   }
   function show(tab){
     current=tab;viewport.replaceChildren();
-    for(const [id,el] of tabButtons){el.classList.toggle('active',id===tab);el.setAttribute('aria-selected',String(id===tab));}
+    for(const [id,el] of tabButtons){el.classList.toggle('active',id===tab);el.setAttribute('aria-selected',String(id===tab));el.tabIndex=id===tab?0:-1;}viewport.setAttribute('aria-labelledby','account-tab-'+tab);
     if(tab==='access'){
       if(!overview){viewport.append(block('div','Vérification des accès…','portal-loading'));return;}
-      if(!overview.active){
-        const empty=block('div',undefined,'portal-empty');
-        const text=block('div',undefined,'portal-empty-text');
-        text.append(block('span','MES ACCÈS','client-kicker'),block('h3','Aucun pass actif'),block('p','Tes accès seront disponibles après ton premier achat.'));
-        empty.append(text,link('Découvrir les offres','/offres','btn client-button-primary portal-action'));
-        viewport.append(empty,profileVisibilitySetting());
-        return;
-      }
-      const active=purchases.filter(p=>p.active);
-      const last=active.find(p=>p.planId==='life')||active[0];
       const display={day:'Pass Jour',week:'Pass Semaine',month:'Pass Mois',life:'Pass Lifetime'};
-      const pass=block('div',undefined,'portal-pass-line');
-      pass.append(block('span','PASS ACTIF','client-kicker'),block('strong',display[last?.planId]||'Bro Client'),
-        block('span',last?.planId==='life'?'Accès à vie':'Actif','client-tag-active'));
-      viewport.append(pass);
-      const launcherNotice=block('p','Pour télécharger le launcher, c’est ','client-quiet');
-      const launcherLink=link('ici','https://discord.com/channels/1448897452404117558/1574774596706508821');
-      launcherLink.style.textDecoration='underline';
-      launcherLink.target='_blank';launcherLink.rel='noopener noreferrer';
-      launcherNotice.append(launcherLink,'.');viewport.append(launcherNotice);
-      for(const purchase of active){
-        const keyRow=block('div',undefined,'portal-key-row');
-        keyRow.append(block('strong',display[purchase.planId]||'Pass'),block('span',purchase.expiresAt?'Accès Discord jusqu’au '+new Date(purchase.expiresAt).toLocaleString('fr-FR'):'Accès Discord à vie','client-quiet'));
+      const active=purchases.filter(p=>p.active);
+      const head=block('div',undefined,'account-section-head');
+      const title=block('div');title.append(block('span','ESPACE PERSONNEL','account-eyebrow'),block('h2','Mes clés'),block('p','Retrouve les clés associées à tes commandes.','client-quiet'));
+      head.append(title,smallButton('Actualiser mes accès',()=>refresh(true)));
+      viewport.append(head);
+      const metrics=block('div',undefined,'account-metrics');
+      for(const [n,label] of [[active.filter(p=>p.keyAvailable).length+(overview.legacyKeyAvailable?1:0),'Clés disponibles'],[active.filter(p=>p.waitingStock).length,'En attente de stock'],[purchases.length,'Pass achetés']]){
+        const tile=block('div',undefined,'account-metric');tile.append(block('strong',String(n)),block('span',label));metrics.append(tile);
+      }
+      viewport.append(metrics);
+      if(!purchases.length&&!overview.legacyKeyAvailable){
+        const empty=block('div',undefined,'account-empty');empty.append(block('span','◇','account-empty-icon'),block('h3','Aucune clé pour le moment'),block('p','Tes clés apparaîtront ici après confirmation de ton achat.'),link('Découvrir les offres','/offres','btn client-button-primary'));viewport.append(empty);return;
+      }
+      const list=block('div',undefined,'account-key-list');
+      function keyControls(card,paymentId){
+        const query='?payment='+encodeURIComponent(paymentId);
+        const input=block('input');input.type='text';input.readOnly=true;input.value='•••• •••• ••••';input.className='portal-key-input';input.setAttribute('aria-label','Clé de licence');input.autocomplete='off';input.spellcheck=false;
+        const getKey=async()=>{const r=await fetch('/api/account/key'+query,{cache:'no-store'});if(!r.ok)throw Error();return (await r.json()).key;};
+        const actions=block('div',undefined,'portal-key-actions');let revealed=false;
+        const reveal=smallButton('Afficher',async()=>{try{if(revealed){input.value='•••• •••• ••••';revealed=false;reveal.textContent='Afficher';return;}reveal.disabled=true;const value=await getKey();if(!input.isConnected)return;input.value=value;revealed=true;reveal.textContent='Masquer';}catch{status('Clé indisponible.');}finally{reveal.disabled=false;}});
+        actions.append(reveal,smallButton('Copier',async()=>{try{await navigator.clipboard.writeText(await getKey());status('Clé copiée.');}catch{status('Copie indisponible.');}},'btn client-button-primary'),link('Fichier .txt','/api/account/key.txt'+query,'btn ghost portal-action'));
+        const field=block('div',undefined,'account-key-field');field.append(input,actions);card.append(field);
+      }
+      for(const purchase of [...purchases].sort((a,b)=>Number(b.active)-Number(a.active))){
+        const card=block('article',undefined,'account-key-card');
+        const top=block('div',undefined,'account-key-top'),identity=block('div',undefined,'account-key-identity');
+        const img=block('img');img.src='/assets/robrun.jpg';img.alt='';img.loading='lazy';
+        const name=block('div');name.append(block('small','ROB RUN'),block('h3',display[purchase.planId]||'Pass'));identity.append(img,name);
+        const state=purchase.keyAvailable?'Clé disponible':purchase.waitingStock?'En attente de stock':purchase.active?'Livraison à vérifier':'Accès Discord terminé';
+        const pill=block('span',state,'account-key-state '+(purchase.keyAvailable?'is-ready':purchase.active?'is-waiting':'is-ended'));top.append(identity,pill);card.append(top);
         if(purchase.keyAvailable){
-          const query='?payment='+encodeURIComponent(purchase.paymentId);
-          const input=block('input');input.type='text';input.readOnly=true;input.value='•••• •••• ••••';input.className='portal-key-input';input.setAttribute('aria-label','Clé d’activation');
-          const getKey=async()=>{const r=await fetch('/api/account/key'+query,{cache:'no-store'});if(!r.ok)throw Error();return (await r.json()).key;};
-          keyRow.append(input);
-          const actions=block('div',undefined,'portal-key-actions');
-          actions.append(smallButton('Afficher',async()=>{try{input.value=await getKey();}catch{status('Clé indisponible.');}}),smallButton('Copier',async()=>{try{await navigator.clipboard.writeText(await getKey());status('Clé copiée.');}catch{status('Copie indisponible.');}},'btn client-button-primary'),link('.txt','/api/account/key.txt'+query,'btn ghost portal-action'));
-          keyRow.append(actions,block('p','Le statut d’activation de ta clé n’est pas transmis au site. La date ci-dessus concerne uniquement l’accès Discord.','client-quiet'));
-        }else keyRow.append(block('p',purchase.waitingStock?'Paiement confirmé · Clé en attente de stock.':'Paiement confirmé · Clé non attribuée. Actualise tes accès ou contacte le support avec ta référence de paiement.','client-quiet'));
-        viewport.append(keyRow);
+          keyControls(card,purchase.paymentId);
+        }else card.append(block('p',purchase.waitingStock?'Commande confirmée. Ta clé sera attribuée dès que le stock correspondant sera disponible.':purchase.active?'Commande confirmée. Contacte le support si ta clé reste indisponible.':'Retrouve la référence de cette commande dans Mes achats.','client-quiet'));
+        const meta=block('div',undefined,'account-key-meta');
+        meta.append(block('span',purchase.expiresAt?'Accès Discord : '+new Date(purchase.expiresAt).toLocaleString('fr-FR'):'Accès Discord à vie'),block('span','Activation de la licence : non synchronisée'));
+        card.append(meta);list.append(card);
       }
-      if(overview.legacyKeyAvailable){
-        const old=block('div',undefined,'portal-key-row');old.append(block('strong','Clé historique'));
-        old.append(smallButton('Afficher',async()=>{try{const r=await fetch('/api/account/key?payment=legacy',{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();old.append(block('p',d.key));}catch{status('Clé indisponible.');}}),link('.txt','/api/account/key.txt?payment=legacy','btn ghost portal-action'));viewport.append(old);
-      }
-      viewport.append(profileVisibilitySetting());
-      viewport.append(smallButton('Actualiser mes accès',()=>refresh(true)));
-      viewport.append(smallButton('Synchroniser mon rôle',async()=>{
-        status('Synchronisation des rôles…');
-        try{
-          const response=await fetch('/api/discord/sync',{method:'POST'});
-          const data=await response.json();
-          status(data.status==='role_granted_lifetime'?'Rôles Customer et Lifetime synchronisés.':
-            data.status==='role_granted'?'Rôle Customer synchronisé.':'Synchronisation effectuée : '+(data.status||'non disponible'));
-        }catch{status('Synchronisation indisponible.');}
-      }));
+      if(overview.legacyKeyAvailable){const old=block('article',undefined,'account-key-card');old.append(block('h3','Clé historique'));keyControls(old,'legacy');list.append(old);}
+      viewport.append(list);
+      if(active.length){const launcherNotice=block('p','Pour télécharger le launcher, c’est ','client-quiet');const launcherLink=link('ici','https://discord.com/channels/1448897452404117558/1574774596706508821');launcherLink.style.textDecoration='underline';launcherLink.target='_blank';launcherLink.rel='noopener noreferrer';launcherNotice.append(launcherLink,'.');viewport.append(launcherNotice);}
     }else if(tab==='orders'){
       const header=block('div',undefined,'portal-orders-heading');
       header.append(block('strong','Historique des achats'));
@@ -300,7 +299,7 @@ async function account(){
           const row=block('div',undefined,'portal-order-item');
           const names={day:'Jour',week:'Semaine',month:'Mois',life:'Lifetime'};
           row.append(block('strong','Bro Client · '+(names[item.planId]||'Pass')),
-            block('span',item.active?'Actif':'Expiré',item.active?'client-tag-active':'client-tag-expired'));
+            block('span',item.active?'Accès Discord actif':'Accès Discord terminé',item.active?'client-tag-active':'client-tag-expired'));
           viewport.append(row);
         }
       }
@@ -314,7 +313,6 @@ async function account(){
       viewport.append(invoices);
       const ordersLink=link('Ouvrir mes factures Whop','https://whop.com/@me/settings/orders/','portal-small-link');
       ordersLink.target='_blank';ordersLink.rel='noopener noreferrer';viewport.append(ordersLink);
-      viewport.append(profileVisibilitySetting());
     }else if(tab==='help'){
       viewport.append(block('h3','Besoin d’aide ?'),block('p','Assistance pour ton compte et tes achats.','client-quiet'));
       const links=block('div',undefined,'portal-help-actions');
@@ -322,7 +320,14 @@ async function account(){
       const guild=link('Contacter le vendeur','/informations.html#assistance','btn client-discord-link portal-action');
       guild.target='_blank';guild.rel='noopener noreferrer';links.append(guild);
       viewport.append(links);
-      viewport.append(profileVisibilitySetting());
+    }else if(tab==='settings'){
+      viewport.append(block('h2','Paramètres du compte'),block('p','Gère la visibilité de tes achats et la liaison Discord.','client-quiet'),profileVisibilitySetting());
+      viewport.append(smallButton('Délier Discord',()=>logout.click()),smallButton('Synchroniser mon rôle',async()=>{
+        status('Synchronisation des rôles…');
+        try{const response=await fetch('/api/discord/sync',{method:'POST'});if(!response.ok)throw Error();const data=await response.json();
+          status(data.status==='role_granted_lifetime'?'Rôles Customer et Lifetime synchronisés.':data.status==='role_granted'?'Rôle Customer synchronisé.':'Synchronisation : '+(data.status||'non disponible'));
+        }catch{status('Synchronisation indisponible.');}
+      }));
     }else if(tab==='admin'&&user.admin){
       const area=block('div',undefined,'portal-admin-tools');
       area.append(block('h3','Gestion Bro Client'));
@@ -382,7 +387,7 @@ async function account(){
   show('access');
   if(!overview)refresh();
   // Whop can redirect before the signed webhook arrives. Poll briefly only on a return to the account.
-  if(location.hash==='#compte'){let tries=0;const timer=setInterval(()=>{if(!modal.open||!viewport.isConnected||++tries>12){clearInterval(timer);return;}refresh();},5000);}
+  if($('#accountPage')){let tries=0;const timer=setInterval(()=>{if(!viewport.isConnected||++tries>12){clearInterval(timer);return;}refresh();},5000);}
 }
 async function loadInvoices(target,cursor) {
   const note=block('p','Chargement des paiements…');target.append(note);
@@ -499,7 +504,7 @@ async function loadUser(){
 }
 document.querySelectorAll('i[data-icon]').forEach(el=>{el.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+paths[el.dataset.icon]+'</svg>';});
 $('.close').onclick=()=>modal.close();modal.addEventListener('click',e=>{if(e.target===modal){const r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)modal.close();}});
-document.querySelectorAll('[data-account]').forEach(el=>el.onclick=account);
+document.querySelectorAll('[data-account]').forEach(el=>el.onclick=()=>account());
 
 const menu=$('nav');const hamburger=$('.hamb');hamburger.onclick=()=>{const show=menu.classList.toggle('open');hamburger.setAttribute('aria-expanded',String(show));};
 menu.querySelectorAll('a').forEach(el=>el.onclick=()=>{menu.classList.remove('open');hamburger.setAttribute('aria-expanded','false');});
@@ -507,11 +512,13 @@ const sections=Array.from(menu.querySelectorAll('a[href^="#"]')).map(a=>[a,docum
 function updateNav(){if(!sections.length)return;let current=sections[0];for(const pair of sections)if(pair[1].getBoundingClientRect().top<=180)current=pair;for(const [a] of sections)if(a===current[0])a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');}
 window.addEventListener('scroll',updateNav,{passive:true});
 if(location.hash==='#tarifs')location.replace('/offres');
+if(location.hash==='#compte'&&!$('#accountPage'))location.replace('/espace-client'+location.search);
+window.addEventListener('hashchange',()=>{if(location.hash==='#compte'&&!$('#accountPage'))location.assign('/espace-client'+location.search);});
 (async()=>{
   const session=loadUser();
   try{const res=await fetch('/api/site',{cache:'no-store'});if(!res.ok)throw Error();site=await res.json();if(!site.content||!site.plans)throw Error();}
   catch{site=await(await fetch('/defaults.json')).json();}
-  render();await session;if(location.hash==='#compte'&&!modal.open)account();
+  render();await session;if($('#accountPage'))account();
 })();
 
 

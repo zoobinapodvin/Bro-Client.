@@ -3,6 +3,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/espace-client",
+      "destination": "/espace-client.html"
+    },
+    {
       "source": "/guides",
       "destination": "/api/platform?route=guides"
     },
