@@ -14,7 +14,7 @@ import {recentPurchases,getActivityPreference,setActivityPreference,backfillWhop
 import {canEditPatchnotes,listPatchnotes,readPatchnote,editPatchnote} from '../lib/patchnotes.mjs';
 import {reconcilePaymentNotifications} from '../lib/purchase-notify.mjs';
 import {completeTebexPayment,recoverConfiguredTebexPayment} from '../lib/tebex.mjs';
-import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides,CUSTOMER_GUIDES_KEY} from '../lib/customer-guides.mjs';
+import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides,CUSTOMER_GUIDES_KEY,customerGuideIndex,selectCustomerGuide} from '../lib/customer-guides.mjs';
 // Profile persistence must never block authentication or the checkout route.
 async function rememberAccount(user){
  try{return await registerAccount(bucket,user);}catch(error){console.error('Bro account registry unavailable',error?.name);return null;}
@@ -157,6 +157,8 @@ export default async function handler(req,res) {
       res.setHeader('X-Robots-Tag','noindex, nofollow');
       if(!await canReadCustomerGuides(bucket,user))return res.status(user?403:401).end(renderCustomerGuides());
       const catalog=await readCustomerGuideCatalog(bucket);
+      const id=parsed.searchParams.get('guide');
+      if(id!==null){const guide=selectCustomerGuide(catalog.guides,id);return guide?res.end(renderCustomerGuides([guide])):res.status(404).end(renderCustomerGuides([]));}
       return res.end(renderCustomerGuides(catalog.guides));
     }
     if(/^\/gestion-cles\/commande\/pay_[A-Za-z0-9]+$/.test(path)&&req.method==='GET'){
@@ -306,6 +308,10 @@ export default async function handler(req,res) {
       if(!user)return res.status(401).json({error:'Connexion requise.'});
       const key=CUSTOMER_GUIDES_KEY;
       if(req.method==='GET'){
+        if(parsed.searchParams.get('view')==='index'){
+          if(!await canReadCustomerGuides(bucket,user))return res.status(403).json({error:'Achat vérifié requis.'});
+          const catalog=await readCustomerGuideCatalog(bucket);return res.json({guides:customerGuideIndex(catalog.guides)});
+        }
         if(!user.admin&&!await canReadCustomerGuides(bucket,user))return res.status(403).json({error:'Achat vérifié requis.'});
         return res.json(await readCustomerGuideCatalog(bucket));
       }

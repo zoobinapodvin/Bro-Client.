@@ -167,7 +167,7 @@ test('workbook import validates all categories in one commit and blocks conflict
  const view=await stockOverview(store);assert.equal(view.rows.filter(r=>r.status==='quarantine').length,1);assert.equal(view.rows.filter(r=>r.status==='sold').length,1);
 });
 
-import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides} from '../lib/customer-guides.mjs';
+import {canReadCustomerGuides,readCustomerGuideCatalog,renderCustomerGuides,customerGuideIndex,selectCustomerGuide} from '../lib/customer-guides.mjs';
 test('only verified buyers can read the new customer documentation, including former buyers',async()=>{
  assert.equal(await canReadCustomerGuides(bucket(ledger()),null),false);
  assert.equal(await canReadCustomerGuides(bucket(),{discordId:buyer}),false);
@@ -231,4 +231,17 @@ test('automatic replenishment serves already-paid waiting orders for matching pa
  const ui=readFileSync(new URL('../key-stock.js',import.meta.url),'utf8');
  const api=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
  assert.doesNotMatch(ui,/Attribuer une clé|endpoint\+'\/assign'/);assert.doesNotMatch(api,/\/api\/admin\/key-stock\/assign/);
+});
+
+test('guide index exposes titles only and resolves the exact guide without exposing a different body',async()=>{
+ const {guides}=await readCustomerGuideCatalog(bucket());
+ const index=customerGuideIndex(guides);assert.equal(index.length,guides.length);
+ assert.ok(index.every(g=>Object.keys(g).sort().join(',')==='id,title'));
+ assert.equal(selectCustomerGuide(guides,index[1].id),guides[1]);
+ assert.equal(selectCustomerGuide(guides,'bad'),null);
+ const html=renderCustomerGuides([selectCustomerGuide(guides,index[1].id)]);
+ assert.match(html,/Accès et configuration/);assert.doesNotMatch(html,/Préparer une demande d’assistance/);
+ assert.match(html,/\/espace-client\?tab=guides/);
+ const api=readFileSync(new URL('../api/platform.js',import.meta.url),'utf8');
+ assert.match(api,/if\(parsed.searchParams.get\('view'\)==='index'\)\{\s*if\(!await canReadCustomerGuides\(bucket,user\)\)/);
 });

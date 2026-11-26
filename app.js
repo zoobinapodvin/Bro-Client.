@@ -113,7 +113,7 @@ function discordButton(text,href,cls='btn discord-connect'){
   el.prepend(icon);return el;
 }
 
-const accountSkeletonHTML="<div class=\"account-layout account-skeleton\" aria-hidden=\"true\"><aside class=\"account-sidebar\"><div class=\"account-skeleton-profile\"><span></span><div><b></b><i></i></div></div><div class=\"account-skeleton-nav\"><span>Mes clés</span><span>Mes achats</span><span>Assistance</span><span>Paramètres</span></div></aside><div class=\"account-main\"><div class=\"account-section-head\"><div><span class=\"account-eyebrow\">ESPACE PERSONNEL</span><h2>Mes clés</h2><p class=\"client-quiet\">Retrouve les clés associées à tes commandes.</p></div></div><div class=\"account-metrics\"><div class=\"account-metric\"><strong class=\"account-skeleton-bar\"></strong><span>Clés disponibles</span></div><div class=\"account-metric\"><strong class=\"account-skeleton-bar\"></strong><span>En attente de stock</span></div><div class=\"account-metric\"><strong class=\"account-skeleton-bar\"></strong><span>Pass achetés</span></div></div><div class=\"account-key-card account-skeleton-key\"><div class=\"account-skeleton-bar\"></div><div class=\"account-skeleton-bar\"></div></div></div></div>";
+const accountSkeletonHTML="<div class=\"account-layout account-skeleton\" aria-hidden=\"true\"><aside class=\"account-sidebar\"><div class=\"account-skeleton-profile\"><span></span><div><b></b><i></i></div></div><div class=\"account-skeleton-nav\"><span>Mes clés</span><span>Mes achats</span><span>Guides</span><span>Paramètres</span></div></aside><div class=\"account-main\"><div class=\"account-section-head\"><div><span class=\"account-eyebrow\">ESPACE PERSONNEL</span><h2>Mes clés</h2><p class=\"client-quiet\">Retrouve les clés associées à tes commandes.</p></div></div><div class=\"account-metrics\"><div class=\"account-metric\"><strong class=\"account-skeleton-bar\"></strong><span>Clés disponibles</span></div><div class=\"account-metric\"><strong class=\"account-skeleton-bar\"></strong><span>En attente de stock</span></div><div class=\"account-metric\"><strong class=\"account-skeleton-bar\"></strong><span>Pass achetés</span></div></div><div class=\"account-key-card account-skeleton-key\"><div class=\"account-skeleton-bar\"></div><div class=\"account-skeleton-bar\"></div></div></div></div>";
 function paintAccountSkeleton(root){
  root.setAttribute('aria-busy','true');
  root.innerHTML=accountSkeletonHTML;
@@ -189,7 +189,7 @@ async function account(){
   }
   const identity=block('div',undefined,'portal-identity');
   identity.append(block('small','CONNECTÉ AVEC DISCORD'),block('strong',user.discordUsername||'Compte Discord'));
-  if(user.username)identity.append(block('small','Identifiant : '+user.username));
+
   profile.append(identity,block('span','Connecté','portal-connected'));
   const layout=block('div',undefined,'account-layout');
   const sidebar=block('aside',undefined,'account-sidebar');
@@ -202,7 +202,7 @@ async function account(){
   const viewport=block('section',undefined,'portal-view');viewport.setAttribute('aria-live','polite');
   const tabButtons=new Map();
   let overview=freshOverview(),purchases=overview?.purchases||[],current='access',refreshing=false,overviewSignature=overview?JSON.stringify(overview):'';
-  for(const [id,label] of [['access','Mes clés'],['orders','Mes achats'],['help','Assistance'],['settings','Paramètres'],...(user.admin?[['admin','Administration']]:[])]){
+  for(const [id,label] of [['access','Mes clés'],['orders','Mes achats'],['help','Guides'],['settings','Paramètres'],...(user.admin?[['admin','Administration']]:[])]){
     const item=button(label,()=>show(id),'portal-tab');
     item.setAttribute('role','tab');item.id='account-tab-'+id;item.setAttribute('aria-controls','account-panel');item.setAttribute('aria-selected','false');
     item.addEventListener('keydown',e=>{const entries=[...tabButtons.entries()],index=entries.findIndex(([k])=>k===id);let n;if(e.key==='ArrowRight'||e.key==='ArrowDown')n=(index+1)%entries.length;else if(e.key==='ArrowLeft'||e.key==='ArrowUp')n=(index+entries.length-1)%entries.length;else if(e.key==='Home')n=0;else if(e.key==='End')n=entries.length-1;else return;e.preventDefault();show(entries[n][0]);entries[n][1].focus();});
@@ -221,7 +221,7 @@ async function account(){
     }catch{notice.textContent='Déconnexion indisponible. Réessaie.';logout.disabled=false;}
   },'portal-logout');
   const discordLogo=block('span',undefined,'discord-brand-icon');discordLogo.innerHTML=discordMark;
-  logout.prepend(discordLogo);footer.append(logout);sidebar.append(footer);
+  logout.prepend(discordLogo);footer.append(logout);
 
   const status=(text)=>{notice.textContent=text||'';};
   async function refresh(manual=false){
@@ -233,8 +233,9 @@ async function account(){
       const signature=JSON.stringify(next),changed=signature!==overviewSignature;
       overview=next;overviewSignature=signature;
       purchases=overview.purchases||[];
+      const previousGuideAccess=user?.guideAccess;
       if(user){user.guideAccess=overview.hasPurchase===true;syncGuideNavigation();}
-      if(changed&&(current==='access'||current==='orders'))show(current);
+      if(changed&&(current==='access'||current==='orders'||(current==='help'&&previousGuideAccess!==user?.guideAccess)))show(current);
       if(manual)status('Achats actualisés.');
     }catch{
       if(manual||!overview)status('Impossible de récupérer les achats actuellement.');
@@ -244,37 +245,75 @@ async function account(){
   function smallButton(label,callback,cls='btn ghost'){
     return button(label,callback,cls+' portal-action');
   }
+  function settingRow(title,description,action){
+    const row=block('div',undefined,'account-setting-row'),copy=block('div',undefined,'account-setting-copy');
+    copy.append(block('strong',title));if(description)copy.append(block('p',description));
+    row.append(copy);if(action)row.append(action);return row;
+  }
+  function settingGroup(title,...rows){
+    const group=block('section',undefined,'account-setting-group');group.append(block('h3',title));
+    const items=block('div',undefined,'account-setting-items');items.append(...rows);group.append(items);return group;
+  }
   function profileVisibilitySetting(){
-    const panel=block('div',undefined,'portal-visibility-setting');
-    panel.append(block('strong','Visibilité de mes achats','portal-visibility-title'));
-    panel.append(block('p','Les nouveaux achats affichent ton nom d’affichage et ta photo Discord par défaut, sauf achat anonyme ou désactivation. Les anciens achats anonymes ne sont pas publiés rétroactivement.','portal-visibility-help'));
-    const choice=block('label',undefined,'portal-consent-label');
-    const checkbox=block('input');checkbox.type='checkbox';checkbox.disabled=true;
-    choice.append(checkbox,block('span','Afficher mon profil Discord dans les derniers achats'));
-    panel.append(choice);
-    const revealOld=button('Afficher aussi mes anciens achats',()=>saveVisibility(true),'btn ghost portal-action');revealOld.hidden=true;panel.append(revealOld);
-    fetch('/api/account/publicity',{cache:'no-store'})
+    const panel=block('div',undefined,'account-privacy-controls');
+    const choice=block('label',undefined,'account-switch');const checkbox=block('input');checkbox.type='checkbox';checkbox.disabled=true;checkbox.setAttribute('role','switch');checkbox.setAttribute('aria-label','Afficher mon profil dans les achats publics');
+    choice.append(checkbox,block('span',undefined,'account-switch-track'));
+    const row=settingRow('Profil dans les derniers achats','Afficher ton nom et ton avatar Discord sur les achats publics.',choice);
+    panel.append(row);
+    const revealOld=smallButton('Afficher',()=>saveVisibility(true),'btn ghost account-setting-action');
+    const historical=settingRow('Anciens achats','Publier aussi tes anciens achats éligibles.',revealOld);historical.hidden=true;panel.append(historical);
+    let confirmed=false;
+    const error=block('p','','account-inline-status');error.setAttribute('role','status');panel.append(error);
+    fetch('/api/account/publicity',{cache:'no-store',signal:AbortSignal.timeout(12000)})
       .then(response=>{if(!response.ok)throw Error();return response.json();})
-      .then(data=>{if(panel.isConnected){checkbox.checked=data.showPublic===true;checkbox.disabled=false;revealOld.hidden=!data.showPublic||data.historicalPublic===true;}})
-      .catch(()=>{if(panel.isConnected)checkbox.disabled=true;});
+      .then(data=>{if(panel.isConnected){confirmed=data.showPublic===true;checkbox.checked=confirmed;checkbox.disabled=false;historical.hidden=!confirmed||data.historicalPublic===true;}})
+      .catch(()=>{if(panel.isConnected){checkbox.disabled=true;error.textContent='Préférence indisponible. Réouvre cet onglet pour réessayer.';}});
     checkbox.onchange=()=>saveVisibility(checkbox.checked);
     async function saveVisibility(checked){
-      const previous=checkbox.checked===checked?!checked:checkbox.checked;
-      checkbox.disabled=true;revealOld.disabled=true;
+      checkbox.disabled=true;revealOld.disabled=true;error.textContent='';
       try{
-        const response=await fetch('/api/account/publicity',{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({showPublic:checked})
-        });
+        const response=await fetch('/api/account/publicity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({showPublic:checked})});
         if(!response.ok)throw Error();
-        status(checked?'Profil visible pour tes achats vérifiés et associés.':'Tes achats resteront anonymes sur le site.');
-        checkbox.checked=checked;revealOld.hidden=true;
+        confirmed=checked;checkbox.checked=checked;historical.hidden=true;
+        error.textContent=checked?'Visibilité activée.':'Visibilité désactivée.';
         if(document.querySelector('#purchaseBoard'))refreshRecentBoard();
-      }catch{
-        checkbox.checked=revealOld.hidden?previous:true;status('Impossible de modifier la visibilité pour le moment.');
-      }finally{checkbox.disabled=false;revealOld.disabled=false;}
+      }catch{checkbox.checked=confirmed;error.textContent='Impossible d’enregistrer cette préférence.';}
+      finally{checkbox.disabled=false;revealOld.disabled=false;}
     }
     return panel;
+  }
+  function accountHeading(title,desc){
+    const heading=block('div',undefined,'account-tab-heading');heading.append(block('h2',title),block('p',desc));return heading;
+  }
+  function guideSupport(){
+    const panel=block('section',undefined,'account-support-card');
+    const icon=block('span',undefined,'account-support-icon');icon.innerHTML=discordMark;
+    const copy=block('div');copy.append(block('h3','Une question ?'),block('p','Contacte le support BRO sur Discord pour obtenir de l’aide.'));
+    const action=discordButton('Support Discord','https://discord.com/channels/1448897452404117558','btn client-button-primary account-support-action');action.target='_blank';action.rel='noopener noreferrer';
+    const alternative=link('Autre moyen de contact','/informations.html#assistance','account-support-alt');copy.append(alternative);
+    panel.append(icon,copy,action);return panel;
+  }
+  let guideIndex=null,guideRequest=null;
+  function renderGuideIndex(target){
+    if(!target.isConnected||current!=='help'||user?.guideAccess!==true)return;
+    if(guideIndex){
+      target.replaceChildren();
+      if(!guideIndex.length){target.append(block('p','Aucun guide publié pour le moment.','client-quiet'));return;}
+      const grid=block('div',undefined,'account-guides-grid');
+      for(const [i,g] of guideIndex.entries()){
+        if(!/^[a-f0-9]{24}$/.test(g.id)||typeof g.title!=='string')continue;
+        const card=link('', '/guides?guide='+encodeURIComponent(g.id),'account-guide-card');
+        const top=block('div',undefined,'account-guide-top'),icon=block('span',undefined,'account-guide-icon');icon.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5a2 2 0 0 1 2-2h14v18H6a2 2 0 0 1 0-4h14"/><path d="M8 7h8M8 11h5"/></svg>';
+        top.append(icon,block('span','GUIDE '+String(i+1).padStart(2,'0'),'account-guide-number'));
+        card.append(top,block('h3',g.title),block('span','Lire le guide  →','account-guide-cta'));grid.append(card);
+      }
+      target.append(grid);return;
+    }
+    target.replaceChildren(block('p','Récupération des guides…','client-quiet'));
+    if(!guideRequest){
+      guideRequest=fetch('/api/guides?view=index',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(async r=>{if(!r.ok)throw Error();const result=await r.json();if(!Array.isArray(result.guides))throw Error();guideIndex=result.guides;}).finally(()=>{guideRequest=null;});
+    }
+    guideRequest.then(()=>renderGuideIndex(target)).catch(()=>{if(target.isConnected&&current==='help')target.replaceChildren(block('p','Guides momentanément indisponibles.','client-quiet'),smallButton('Réessayer',()=>renderGuideIndex(target)));});
   }
   function show(tab){
     current=tab;viewport.replaceChildren();
@@ -349,20 +388,26 @@ async function account(){
       const ordersLink=link('Ouvrir mes factures Whop','https://whop.com/@me/settings/orders/','portal-small-link');
       ordersLink.target='_blank';ordersLink.rel='noopener noreferrer';viewport.append(ordersLink);
     }else if(tab==='help'){
-      viewport.append(block('h3','Besoin d’aide ?'),block('p','Assistance pour ton compte et tes achats.','client-quiet'));
-      const links=block('div',undefined,'portal-help-actions');
-      if(user.guideAccess===true)links.append(link('Consulter les guides','/guides','btn client-button-primary'));
-      const guild=link('Contacter le vendeur','/informations.html#assistance','btn client-discord-link portal-action');
-      guild.target='_blank';guild.rel='noopener noreferrer';links.append(guild);
-      viewport.append(links);
+      viewport.append(accountHeading('Guides','Retrouve la documentation et l’assistance BRO.'));
+      if(user.guideAccess===true){
+        const section=block('section',undefined,'account-guides-section');section.append(block('h3','Tes guides'));
+        const target=block('div');section.append(target);viewport.append(section);renderGuideIndex(target);
+      }
+      viewport.append(guideSupport());
     }else if(tab==='settings'){
-      viewport.append(block('h2','Paramètres du compte'),block('p','Gère la visibilité de tes achats et la liaison Discord.','client-quiet'),profileVisibilitySetting());
-      viewport.append(smallButton('Délier Discord',()=>logout.click()),smallButton('Synchroniser mon rôle',async()=>{
-        status('Synchronisation des rôles…');
+      viewport.append(accountHeading('Paramètres','Gère ton compte et tes préférences.'));
+      const copyId=smallButton('Copier',async()=>{try{await navigator.clipboard.writeText(user.username);status('Identifiant copié.');}catch{status('Copie indisponible.');}},'btn ghost account-setting-action');
+      const profileRows=[settingRow('Compte Discord',user.discordUsername||'Compte connecté',block('span','Connecté','account-settings-connected'))];
+      if(user.username)profileRows.push(settingRow('Identifiant BRO',user.username,copyId));
+      viewport.append(settingGroup('Mon compte',...profileRows));
+      viewport.append(settingGroup('Confidentialité',profileVisibilitySetting()));
+      const sync=smallButton('Synchroniser',async()=>{
+        sync.disabled=true;sync.textContent='Synchronisation…';
         try{const response=await fetch('/api/discord/sync',{method:'POST'});if(!response.ok)throw Error();const data=await response.json();
           status(data.status==='role_granted_lifetime'?'Rôles Customer et Lifetime synchronisés.':data.status==='role_granted'?'Rôle Customer synchronisé.':'Synchronisation : '+(data.status||'non disponible'));
-        }catch{status('Synchronisation indisponible.');}
-      }));
+        }catch{status('Synchronisation indisponible.');}finally{sync.disabled=false;sync.textContent='Synchroniser';}
+      },'btn ghost account-setting-action');
+      viewport.append(settingGroup('Connexion et accès',settingRow('Rôles Discord','Actualiser tes accès Discord associés à tes achats.',sync),settingRow('Délier Discord','Déconnecter cette session de ton espace client.',smallButton('Délier',()=>{if(confirm('Délier ton compte Discord de cette session ?'))logout.click();},'btn ghost account-setting-action account-danger-action'))));
     }else if(tab==='admin'&&user.admin){
       const area=block('div',undefined,'portal-admin-tools');
       area.append(block('h3','Gestion Bro Client'));
@@ -419,7 +464,7 @@ async function account(){
       viewport.append(area);
     }
   }
-  show('access');
+  show(new URLSearchParams(location.search).get('tab')==='guides'?'help':'access');
   if(!overview)refresh();
   // Whop can redirect before the signed webhook arrives. Poll briefly only on a return to the account.
   if($('#accountPage')){let tries=0;const timer=setInterval(()=>{if(!viewport.isConnected||++tries>12){clearInterval(timer);return;}refresh();},5000);}
