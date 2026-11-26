@@ -13,11 +13,38 @@ const paths = {
 let site, user = null, accountReady = false;
 let sessionRequest=null,overviewRequest=null,preloadedOverview=null,overviewAt=0,sessionEpoch=0,sessionAt=0;
 const sessionFresh=()=>accountReady&&Date.now()-sessionAt<30000;
+// Only authenticated metadata is kept in this document's memory. Never cache keys,
+// PDF contents, or admin endpoints. Session changes discard every cached response.
+const accountTabCache=new Map();
+function clearAccountTabData(){accountTabCache.clear();}
+function invalidateAccountTabData(prefix){for(const path of accountTabCache.keys())if(path===prefix||path.startsWith(prefix+'?'))accountTabCache.delete(path);}
+function peekAccountTabData(path){const item=accountTabCache.get(path);return item?.epoch===sessionEpoch&&user?item.data:undefined;}
+function readAccountTabData(path){
+ if(!user||!(/^\/api\/invoices(?:\?cursor=[^&]+)?$/.test(path)||path==='/api/guides?view=index'||path==='/api/account/publicity'))return Promise.reject(Error('account_tab_request'));
+ const epoch=sessionEpoch,existing=accountTabCache.get(path);
+ if(existing?.epoch===epoch)return existing.promise;
+ const entry={epoch,data:undefined,promise:null};
+ entry.promise=(async()=>{
+  const r=await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(12000)});
+  if(!r.ok)throw Error('account_tab_http_'+r.status);
+  const data=await r.json();
+  if(epoch!==sessionEpoch||!user||accountTabCache.get(path)!==entry)throw Error('account_tab_session');
+  if(path.startsWith('/api/invoices')&&!Array.isArray(data.invoices)||path==='/api/guides?view=index'&&!Array.isArray(data.guides)||path==='/api/account/publicity'&&typeof data.showPublic!=='boolean')throw Error('account_tab_data');
+  entry.data=data;return data;
+ })();
+ accountTabCache.set(path,entry);
+ entry.promise.catch(()=>{if(accountTabCache.get(path)===entry)accountTabCache.delete(path);});
+ return entry.promise;
+}
+function warmAccountTabData(){
+ if(!user)return;
+ for(const path of ['/api/invoices','/api/account/publicity',...(user.guideAccess===true?['/api/guides?view=index']:[])])readAccountTabData(path).catch(()=>{});
+}
 const freshOverview=()=>preloadedOverview&&Date.now()-overviewAt<30000?preloadedOverview:null;
 async function requestOverview(){
  if(overviewRequest)return overviewRequest;
  const epoch=sessionEpoch;
- const pending=(async()=>{const r=await fetch('/api/account/overview',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(r.status===401&&epoch===sessionEpoch){sessionEpoch++;user=null;accountReady=false;sessionAt=0;preloadedOverview=null;overviewAt=0;syncGuideNavigation();if($('#accountPage'))account();throw Error('session_expired');}if(!r.ok)throw Error('overview');const value=await r.json();if(epoch!==sessionEpoch||!user)throw Error('session_changed');preloadedOverview=value;overviewAt=Date.now();return value;})();
+ const pending=(async()=>{const r=await fetch('/api/account/overview',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(r.status===401&&epoch===sessionEpoch){sessionEpoch++;clearAccountTabData();user=null;accountReady=false;sessionAt=0;preloadedOverview=null;overviewAt=0;syncGuideNavigation();if($('#accountPage'))account();throw Error('session_expired');}if(!r.ok)throw Error('overview');const value=await r.json();if(epoch!==sessionEpoch||!user)throw Error('session_changed');preloadedOverview=value;overviewAt=Date.now();return value;})();
  overviewRequest=pending;try{return await pending;}finally{if(overviewRequest===pending)overviewRequest=null;}
 }
 function syncGuideNavigation(){document.querySelectorAll('[data-paid-guides]').forEach(el=>{el.hidden=user?.guideAccess!==true;});document.querySelectorAll('[data-guest-checkout-note]').forEach(el=>{el.hidden=true;});window.dispatchEvent(new Event('bro-session-changed'));}
@@ -120,7 +147,8 @@ function paintAccountSkeleton(root){
 }
 let accountNavigationMounted=false;
 function warmAccount(){
- if(sessionRequest||sessionFresh())return;
+ if(sessionRequest)return;
+ if(sessionFresh()){warmAccountTabData();return;}
  loadUser().catch(()=>{});
 }
 function openAccountPage(){
@@ -146,7 +174,7 @@ function openAccountPage(){
  account();
 }
 window.addEventListener('popstate',()=>{if(accountNavigationMounted&&location.pathname!=='/espace-client')location.reload();});
-window.addEventListener('pagehide',()=>{const root=$('#accountPage');if(root){sessionEpoch++;sessionRequest=null;overviewRequest=null;preloadedOverview=null;overviewAt=0;sessionAt=0;accountReady=false;user=null;paintAccountSkeleton(root);}});
+window.addEventListener('pagehide',()=>{const root=$('#accountPage');if(root){sessionEpoch++;clearAccountTabData();sessionRequest=null;overviewRequest=null;preloadedOverview=null;overviewAt=0;sessionAt=0;accountReady=false;user=null;paintAccountSkeleton(root);}});
 window.addEventListener('pageshow',e=>{if(e.persisted&&$('#accountPage')){loadUser();account();}});
 
 async function account(){
@@ -217,7 +245,7 @@ async function account(){
     try{
       const res=await fetch('/auth/unlink',{method:'POST'});
       if(!res.ok)throw Error();
-      sessionEpoch++;sessionRequest=null;user=null;accountReady=true;sessionAt=Date.now();preloadedOverview=null;overviewAt=0;overviewRequest=null;syncGuideNavigation();account();
+      sessionEpoch++;clearAccountTabData();sessionRequest=null;user=null;accountReady=true;sessionAt=Date.now();preloadedOverview=null;overviewAt=0;overviewRequest=null;syncGuideNavigation();account();
     }catch{notice.textContent='Déconnexion indisponible. Réessaie.';logout.disabled=false;}
   },'portal-logout');
   const discordLogo=block('span',undefined,'discord-brand-icon');discordLogo.innerHTML=discordMark;
@@ -233,9 +261,9 @@ async function account(){
       const signature=JSON.stringify(next),changed=signature!==overviewSignature;
       overview=next;overviewSignature=signature;
       purchases=overview.purchases||[];
-      if(changed){historyRevision++;purchaseHistory=null;purchaseHistoryRequest=null;}
+      if(changed){historyRevision++;purchaseHistory=null;purchaseHistoryRequest=null;invalidateAccountTabData('/api/invoices');loadPurchaseHistory().catch(()=>{});}
       const previousGuideAccess=user?.guideAccess;
-      if(user){user.guideAccess=overview.hasPurchase===true;syncGuideNavigation();}
+      if(user){user.guideAccess=overview.hasPurchase===true;if(previousGuideAccess!==user.guideAccess){guideIndex=null;guideRequest=null;invalidateAccountTabData('/api/guides?view=index');}syncGuideNavigation();if(user.guideAccess)loadGuideIndex().catch(()=>{});}
       if(changed&&(current==='access'||current==='orders'||(current==='help'&&previousGuideAccess!==user?.guideAccess)))show(current);
       if(manual)status('Achats actualisés.');
     }catch{
@@ -255,6 +283,7 @@ async function account(){
     const group=block('section',undefined,'account-setting-group');group.append(block('h3',title));
     const items=block('div',undefined,'account-setting-items');items.append(...rows);group.append(items);return group;
   }
+  let privacySave=null;
   function profileVisibilitySetting(){
     const panel=block('div',undefined,'account-privacy-controls');
     const choice=block('label',undefined,'account-switch');const checkbox=block('input');checkbox.type='checkbox';checkbox.disabled=true;checkbox.setAttribute('role','switch');checkbox.setAttribute('aria-label','Afficher mon profil dans les achats publics');
@@ -265,21 +294,34 @@ async function account(){
     const historical=settingRow('Anciens achats','Publier aussi tes anciens achats éligibles.',revealOld);historical.hidden=true;panel.append(historical);
     let confirmed=false;
     const error=block('p','','account-inline-status');error.setAttribute('role','status');panel.append(error);
-    fetch('/api/account/publicity',{cache:'no-store',signal:AbortSignal.timeout(12000)})
-      .then(response=>{if(!response.ok)throw Error();return response.json();})
-      .then(data=>{if(panel.isConnected){confirmed=data.showPublic===true;checkbox.checked=confirmed;checkbox.disabled=false;historical.hidden=!confirmed||data.historicalPublic===true;}})
-      .catch(()=>{if(panel.isConnected){checkbox.disabled=true;error.textContent='Préférence indisponible. Réouvre cet onglet pour réessayer.';}});
+    function apply(data){
+      confirmed=data.showPublic===true;checkbox.checked=confirmed;checkbox.disabled=false;revealOld.disabled=false;historical.hidden=!confirmed||data.historicalPublic===true;
+    }
+    function unavailable(){if(panel.isConnected){checkbox.disabled=true;error.textContent='Préférence indisponible. Réouvre cet onglet pour réessayer.';}}
+    const cached=peekAccountTabData('/api/account/publicity');
+    if(cached&&!privacySave)apply(cached);
+    else (privacySave||readAccountTabData('/api/account/publicity')).then(data=>{if(panel.isConnected)apply(data);}).catch(unavailable);
     checkbox.onchange=()=>saveVisibility(checkbox.checked);
     async function saveVisibility(checked){
+      if(privacySave)return;
       checkbox.disabled=true;revealOld.disabled=true;error.textContent='';
-      try{
+      const epoch=sessionEpoch;
+      const operation=(async()=>{
         const response=await fetch('/api/account/publicity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({showPublic:checked})});
         if(!response.ok)throw Error();
-        confirmed=checked;checkbox.checked=checked;historical.hidden=true;
-        error.textContent=checked?'Visibilité activée.':'Visibilité désactivée.';
+        if(epoch!==sessionEpoch||!user)throw Error('session_changed');
+        invalidateAccountTabData('/api/account/publicity');
+        return readAccountTabData('/api/account/publicity');
+      })();
+      privacySave=operation;
+      try{
+        const result=await operation;
+        if(panel.isConnected){apply(result);error.textContent=result.showPublic?'Visibilité activée.':'Visibilité désactivée.';}
         if(document.querySelector('#purchaseBoard'))refreshRecentBoard();
-      }catch{checkbox.checked=confirmed;error.textContent='Impossible d’enregistrer cette préférence.';}
-      finally{checkbox.disabled=false;revealOld.disabled=false;}
+      }catch{
+        invalidateAccountTabData('/api/account/publicity');
+        if(panel.isConnected){checkbox.checked=confirmed;error.textContent='Impossible de confirmer cette préférence. Réessaie.';readAccountTabData('/api/account/publicity').then(data=>{if(panel.isConnected)apply(data);}).catch(unavailable);}
+      }finally{if(privacySave===operation)privacySave=null;}
     }
     return panel;
   }
@@ -295,6 +337,19 @@ async function account(){
     panel.append(icon,copy,action);return panel;
   }
   let guideIndex=null,guideRequest=null;
+  function loadGuideIndex(){
+    if(user?.guideAccess!==true)return Promise.resolve(null);
+    if(guideIndex)return Promise.resolve(guideIndex);
+    if(guideRequest)return guideRequest;
+    const epoch=sessionEpoch;
+    const pending=readAccountTabData('/api/guides?view=index').then(result=>{
+      if(epoch!==sessionEpoch||user?.guideAccess!==true||guideRequest!==pending)throw Error('guide_session');
+      guideIndex=result.guides;return guideIndex;
+    });
+    guideRequest=pending;
+    pending.finally(()=>{if(guideRequest===pending)guideRequest=null;}).catch(()=>{});
+    return pending;
+  }
   function renderGuideIndex(target){
     if(!target.isConnected||current!=='help'||user?.guideAccess!==true)return;
     if(guideIndex){
@@ -311,11 +366,10 @@ async function account(){
       }
       target.append(list);return;
     }
-    target.replaceChildren(block('p','Récupération des guides…','client-quiet'));
-    if(!guideRequest){
-      guideRequest=fetch('/api/guides?view=index',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(async r=>{if(!r.ok)throw Error();const result=await r.json();if(!Array.isArray(result.guides))throw Error();guideIndex=result.guides;}).finally(()=>{guideRequest=null;});
-    }
-    guideRequest.then(()=>renderGuideIndex(target)).catch(()=>{if(target.isConnected&&current==='help')target.replaceChildren(block('p','Guides momentanément indisponibles.','client-quiet'),smallButton('Réessayer',()=>renderGuideIndex(target)));});
+    const cached=peekAccountTabData('/api/guides?view=index');
+    if(cached&&user?.guideAccess===true){guideIndex=cached.guides;renderGuideIndex(target);return;}
+    target.replaceChildren(tabPlaceholder());
+    loadGuideIndex().then(()=>renderGuideIndex(target)).catch(()=>{if(target.isConnected&&current==='help')target.replaceChildren(block('p','Guides momentanément indisponibles.','client-quiet'),smallButton('Réessayer',()=>renderGuideIndex(target)));});
   }
   let purchaseHistory=null,purchaseHistoryRequest=null,historyRevision=0;
   function purchaseAmount(record){
@@ -351,7 +405,7 @@ async function account(){
   function bodyGlobal(){return document.getElementById('modalBody');}
   function renderPurchaseHistory(target,force=false){
     if(!target.isConnected||current!=='orders')return;
-    if(force){historyRevision++;purchaseHistoryRequest=null;purchaseHistory=null;}
+    if(force){historyRevision++;purchaseHistoryRequest=null;purchaseHistory=null;invalidateAccountTabData('/api/invoices');}
     if(purchaseHistory){
       target.replaceChildren();
       const records=purchaseHistory,known=new Set(records.map(r=>r.id));
@@ -373,31 +427,40 @@ async function account(){
       }
       return;
     }
-    target.replaceChildren(block('p','Récupération de tes achats…','client-quiet'));
-    if(!purchaseHistoryRequest){
-      const revision=historyRevision,epoch=sessionEpoch;
-      const request=(async()=>{
-        const records=new Map(),seen=new Set();let cursor=null;
-        do{
-          const r=await fetch('/api/invoices'+(cursor?'?cursor='+encodeURIComponent(cursor):''),{cache:'no-store',signal:AbortSignal.timeout(12000)});
-          if(!r.ok)throw Error('history');
-          const result=await r.json();if(!Array.isArray(result.invoices))throw Error('history');
-          for(const record of result.invoices){
-            if(!/^pay_[A-Za-z0-9]+$/.test(record.id)||typeof record.title!=='string'||!Number.isFinite(Date.parse(record.date))||typeof record.amount!=='number'||!Number.isFinite(record.amount)||record.amount<0||!/^[A-Z]{3}$/.test(record.currency)||!/^bro-\d{24}$/.test(record.reference||''))continue;
-            records.set(record.id,record);
-          }
-          cursor=result.nextCursor||null;if(cursor&&seen.has(cursor))throw Error('history_cursor');if(cursor)seen.add(cursor);
-        }while(cursor);
-        if(epoch!==sessionEpoch||revision!==historyRevision||!user)throw Error('history_session');
-        purchaseHistory=[...records.values()].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));
-      })();
-      purchaseHistoryRequest=request;request.finally(()=>{if(purchaseHistoryRequest===request)purchaseHistoryRequest=null;}).catch(()=>{});
+    const cached=peekAccountTabData('/api/invoices');
+    if(cached&&!cached.nextCursor&&!purchaseHistoryRequest){
+      purchaseHistory=validHistory(cached.invoices);renderPurchaseHistory(target);return;
     }
-    purchaseHistoryRequest.then(()=>renderPurchaseHistory(target)).catch(()=>{if(target.isConnected&&current==='orders'&&!purchaseHistoryRequest)target.replaceChildren(block('p','Historique momentanément indisponible.','client-quiet'),smallButton('Réessayer',()=>renderPurchaseHistory(target,true)));});
+    target.replaceChildren(tabPlaceholder());
+    loadPurchaseHistory().then(()=>renderPurchaseHistory(target)).catch(()=>{if(target.isConnected&&current==='orders'&&!purchaseHistoryRequest)target.replaceChildren(block('p','Historique momentanément indisponible.','client-quiet'),smallButton('Réessayer',()=>renderPurchaseHistory(target,true)));});
+  }
+  function validHistory(records){
+    return records.filter(record=>/^pay_[A-Za-z0-9]+$/.test(record.id)&&typeof record.title==='string'&&Number.isFinite(Date.parse(record.date))&&typeof record.amount==='number'&&Number.isFinite(record.amount)&&record.amount>=0&&/^[A-Z]{3}$/.test(record.currency)&&/^bro-\d{24}$/.test(record.reference||'')).sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));
+  }
+  function loadPurchaseHistory(){
+    if(purchaseHistory)return Promise.resolve(purchaseHistory);
+    if(purchaseHistoryRequest)return purchaseHistoryRequest;
+    const revision=historyRevision,epoch=sessionEpoch;
+    const request=(async()=>{
+      const records=new Map(),seen=new Set();let cursor=null;
+      do{
+        const result=await readAccountTabData('/api/invoices'+(cursor?'?cursor='+encodeURIComponent(cursor):''));
+        for(const record of validHistory(result.invoices))records.set(record.id,record);
+        cursor=result.nextCursor||null;if(cursor&&seen.has(cursor))throw Error('history_cursor');if(cursor)seen.add(cursor);
+      }while(cursor);
+      if(epoch!==sessionEpoch||revision!==historyRevision||!user)throw Error('history_session');
+      purchaseHistory=[...records.values()].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));return purchaseHistory;
+    })();
+    purchaseHistoryRequest=request;request.finally(()=>{if(purchaseHistoryRequest===request)purchaseHistoryRequest=null;}).catch(()=>{});
+    return request;
+  }
+  function tabPlaceholder(){
+    const row=block('div',undefined,'account-tab-placeholder');row.setAttribute('role','status');row.setAttribute('aria-label','Récupération des données');
+    row.append(block('span',undefined,'account-skeleton-bar'),block('span',undefined,'account-skeleton-bar'));return row;
   }
   let keyPage=0;
   function show(tab){
-    current=tab;viewport.replaceChildren();
+    current=tab;status('');viewport.replaceChildren();
     for(const [id,el] of tabButtons){el.classList.toggle('active',id===tab);el.setAttribute('aria-selected',String(id===tab));el.tabIndex=id===tab?0:-1;}viewport.setAttribute('aria-labelledby','account-tab-'+tab);
     if(tab==='access'){
       const head=block('div',undefined,'account-section-head account-keys-heading');
@@ -427,14 +490,14 @@ async function account(){
         const input=block('input');input.type='text';input.readOnly=true;input.value='•••• •••• ••••';input.className='portal-key-input';input.setAttribute('aria-label','Clé de licence');input.autocomplete='off';input.spellcheck=false;
         const getKey=async()=>{const r=await fetch('/api/account/key'+query,{cache:'no-store'});if(!r.ok)throw Error();const data=await r.json();if(typeof data.key!=='string'||!data.key)throw Error();return data.key;};
         const actions=block('div',undefined,'portal-key-actions');let revealed=false;
-        const reveal=smallButton('Afficher',async()=>{try{if(revealed){input.value='•••• •••• ••••';revealed=false;reveal.textContent='Afficher';return;}reveal.disabled=true;const value=await getKey();if(!input.isConnected)return;input.value=value;revealed=true;reveal.textContent='Masquer';}catch{status('Clé indisponible.');}finally{reveal.disabled=false;}},'btn ghost account-key-action');
+        const reveal=smallButton('Afficher',async()=>{try{if(revealed){input.value='•••• •••• ••••';revealed=false;reveal.textContent='Afficher';return;}reveal.disabled=true;const value=await getKey();if(!input.isConnected)return;input.value=value;input.scrollLeft=0;revealed=true;reveal.textContent='Masquer';}catch{status('Clé indisponible.');}finally{reveal.disabled=false;}},'btn ghost account-key-action');
         const copy=smallButton('Copier',async()=>{try{await navigator.clipboard.writeText(await getKey());if(input.isConnected)status('Clé copiée.');}catch{status('Copie indisponible.');}},'btn ghost account-key-action');
         const download=link('Télécharger','/api/account/key.txt'+query,'btn ghost portal-action account-key-action');download.download='BRO-cle.txt';download.setAttribute('aria-label','Télécharger la clé au format TXT');
         actions.append(reveal,copy,download);
         const field=block('div',undefined,'account-key-field');field.append(input,actions);card.append(field);
       }
       for(const purchase of entries.slice(keyPage*4,keyPage*4+4)){
-        const card=block('article',undefined,'account-key-card');
+        const card=block('article',undefined,'account-key-card account-key-row');
         const top=block('div',undefined,'account-key-top'),identity=block('div',undefined,'account-key-identity');
         const img=block('img');img.src='/assets/robrunkey.webp';img.alt='';img.width=32;img.height=32;img.loading='lazy';
         const name=block('div',undefined,'account-key-name');
@@ -536,6 +599,8 @@ async function account(){
       viewport.append(area);
     }
   }
+  // Start all permitted tab metadata reads before the customer changes tabs.
+  warmAccountTabData();loadPurchaseHistory().catch(()=>{});loadGuideIndex().catch(()=>{});
   show(new URLSearchParams(location.search).get('tab')==='guides'?'help':'access');
   if(!overview)refresh();
   // Whop can redirect before the signed webhook arrives. Poll briefly only on a return to the account.
@@ -622,7 +687,7 @@ function editor(){
 async function loadUser(){
  if(sessionRequest)return sessionRequest;
  const epoch=sessionEpoch;
- const pending=(async()=>{try{const response=await fetch('/api/me',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error();const data=await response.json();if(epoch!==sessionEpoch)return;sessionEpoch++;overviewRequest=null;user=data.user;accountReady=true;sessionAt=Date.now();preloadedOverview=user?data.overview??null:null;overviewAt=Date.now();if(user&&!preloadedOverview)requestOverview().catch(()=>{});}catch{if(epoch===sessionEpoch){accountReady=false;sessionAt=0;user=null;preloadedOverview=null;}}finally{syncGuideNavigation();}})();
+ const pending=(async()=>{try{const response=await fetch('/api/me',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error();const data=await response.json();if(epoch!==sessionEpoch)return;sessionEpoch++;clearAccountTabData();overviewRequest=null;user=data.user;accountReady=true;sessionAt=Date.now();preloadedOverview=user?data.overview??null:null;overviewAt=Date.now();if(user){warmAccountTabData();if(!preloadedOverview)requestOverview().catch(()=>{});}}catch{if(epoch===sessionEpoch){accountReady=false;sessionAt=0;user=null;preloadedOverview=null;}}finally{syncGuideNavigation();}})();
  sessionRequest=pending;try{return await pending;}finally{if(sessionRequest===pending)sessionRequest=null;}
 }
 document.querySelectorAll('i[data-icon]').forEach(el=>{el.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+paths[el.dataset.icon]+'</svg>';});

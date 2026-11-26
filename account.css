@@ -241,3 +241,31 @@
  .bro-invoice-line{padding:5px 3px}
  .bro-invoice-total{padding:7px}
 }
+
+/* Single-line desktop key rows; no oversized masked-key field. */
+.account-main{container-type:inline-size}
+.account-key-list-compact .account-key-row{padding:11px 12px;gap:9px;background:#1b2633}
+.account-key-list-compact .account-key-row .account-key-identity{gap:9px}
+.account-key-list-compact .account-key-row .account-key-name h3{font-size:.86rem}
+.account-key-list-compact .account-key-row .account-key-name small{font-size:.69rem}
+.account-page .account-key-list-compact .account-key-row .portal-key-input{font-size:.75rem;letter-spacing:0;height:33px;max-width:220px}
+.account-key-list-compact .account-key-row .account-key-field{grid-template-columns:minmax(0,220px) auto;justify-content:start;gap:6px}
+.account-page .account-key-list-compact .account-key-row .account-key-action{min-height:33px;padding:5px 8px;font-size:.73rem}
+.account-tab-placeholder{display:flex;justify-content:space-between;align-items:center;gap:14px;min-height:51px;border-bottom:1px solid #344355;padding:10px 0}
+.account-tab-placeholder .account-skeleton-bar:first-child{width:43%}
+.account-tab-placeholder .account-skeleton-bar:last-child{width:22%}
+@container (min-width:650px){
+ .account-key-list-compact .account-key-row{display:grid;grid-template-columns:minmax(118px,1fr) minmax(0,390px) auto;align-items:center;column-gap:10px;min-height:58px}
+ .account-key-list-compact .account-key-row .account-key-top{display:contents}
+ .account-key-list-compact .account-key-row .account-key-identity{grid-column:1;grid-row:1;min-width:0}
+ .account-key-list-compact .account-key-row .account-key-field,.account-key-list-compact .account-key-row .account-key-delivery{grid-column:2;grid-row:1;min-width:0}
+ .account-key-list-compact .account-key-row .account-key-field{grid-template-columns:minmax(0,1fr) auto;justify-content:end}
+ .account-key-list-compact .account-key-row .account-key-state{grid-column:3;grid-row:1;justify-self:end}
+}
+@media(max-width:760px){
+ .account-key-list-compact .account-key-row{padding:11px;gap:8px}
+ .account-key-list-compact .account-key-row .account-key-field{grid-template-columns:minmax(0,1fr);gap:7px}
+ .account-page .account-key-list-compact .account-key-row .portal-key-input{height:38px;max-width:220px}
+ .account-page .account-key-list-compact .account-key-row .account-key-action{min-height:44px;font-size:.72rem;padding:5px 4px}
+ .account-page .account-key-list-compact .account-key-row .portal-key-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+}

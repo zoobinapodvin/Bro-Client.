@@ -305,7 +305,7 @@ test('new disclosed Tebex purchases display automatically, legacy and private pu
 
 test('customer area is a dedicated responsive page with in-page tabs and verified keys',()=>{const html=readFileSync(new URL('../espace-client.html',import.meta.url),'utf8'),js=readFileSync(new URL('../app.js',import.meta.url),'utf8'),css=readFileSync(new URL('../account.css',import.meta.url),'utf8'),config=JSON.parse(readFileSync(new URL('../vercel.json',import.meta.url),'utf8'));assert.match(html,/<main[^>]*account-page-main/);assert.match(html,/id="accountPage"/);assert.match(html,/<header>/);assert.match(html,/<footer>/);assert.match(html,/name="robots" content="noindex,nofollow"/);assert.ok(config.rewrites.some(r=>r.source==='/espace-client'));assert.ok(js.includes("location.assign('/espace-client')"));assert.ok(js.includes("['access','Mes clés']"));assert.ok(js.includes("['settings','Paramètres']"));assert.ok(js.includes("if(purchase.keyAvailable)"));assert.ok(js.includes("keyControls(card,purchase.paymentId)"));assert.match(js,/Achat|Acheté/);assert.doesNotMatch(js,/Activation de la licence : non synchronisée/);assert.match(css,/@media\(max-width:760px\)/);assert.doesNotMatch(js,/localStorage\.setItem\([^\n]*key/i);});
 
-test('account opens in the current document with an immediate shell and independent session request',()=>{const js=readFileSync(new URL('../app.js',import.meta.url),'utf8'),html=readFileSync(new URL('../espace-client.html',import.meta.url),'utf8'),auth=readFileSync(new URL('../lib/auth.mjs',import.meta.url),'utf8');assert.match(js,/history\.pushState\(\{broAccount:true\},'','\/espace-client'\)/);assert.match(js,/el\.onclick=openAccountPage/);assert.match(js,/sessionFresh\(\)/);assert.match(js,/loadUser\(\);\s*\/\/ The account never waits[^\n]*\n\s*if\(\$\('#accountPage'\)\)account\(\)/);assert.doesNotMatch(html,/Chargement de ton espace client/);assert.match(html,/account-skeleton/);assert.match(auth,/value==='\/espace-client'/);assert.match(js,/window\.addEventListener\('pagehide'/);for(const p of ['index.html','offres.html','patchnotes.html'])assert.match(readFileSync(new URL('../'+p,import.meta.url),'utf8'),/account\.css\?v=7/);});
+test('account opens in the current document with an immediate shell and independent session request',()=>{const js=readFileSync(new URL('../app.js',import.meta.url),'utf8'),html=readFileSync(new URL('../espace-client.html',import.meta.url),'utf8'),auth=readFileSync(new URL('../lib/auth.mjs',import.meta.url),'utf8');assert.match(js,/history\.pushState\(\{broAccount:true\},'','\/espace-client'\)/);assert.match(js,/el\.onclick=openAccountPage/);assert.match(js,/sessionFresh\(\)/);assert.match(js,/loadUser\(\);\s*\/\/ The account never waits[^\n]*\n\s*if\(\$\('#accountPage'\)\)account\(\)/);assert.doesNotMatch(html,/Chargement de ton espace client/);assert.match(html,/account-skeleton/);assert.match(auth,/value==='\/espace-client'/);assert.match(js,/window\.addEventListener\('pagehide'/);for(const p of ['index.html','offres.html','patchnotes.html'])assert.match(readFileSync(new URL('../'+p,import.meta.url),'utf8'),/account\.css\?v=8/);});
 
 test('settings uses compact functional controls and guides are restricted to verified customers',()=>{
  const js=readFileSync(new URL('../app.js',import.meta.url),'utf8'),css=readFileSync(new URL('../account.css',import.meta.url),'utf8');
@@ -326,3 +326,17 @@ test('keys use four chronological entries per page and compact real TXT controls
 });
 
 test('mobile receipts use a compact viewport layout and only BRO references',()=>{const js=readFileSync(new URL('../app.js',import.meta.url),'utf8'),css=readFileSync(new URL('../account.css',import.meta.url),'utf8');assert.ok(js.includes("['Référence BRO',record.reference]"));assert.ok(js.includes("download.download=record.reference+'.pdf'"));assert.match(css,/max-height:calc\(100dvh - 20px\)/);assert.match(css,/\.bro-invoice-actions\{position:sticky/);});
+
+test('account preloads only authorized tab metadata, retains it in memory and uses compact key rows',()=>{
+ const js=readFileSync(new URL('../app.js',import.meta.url),'utf8'),css=readFileSync(new URL('../account.css',import.meta.url),'utf8');
+ assert.ok(js.includes('warmAccountTabData();loadPurchaseHistory().catch(()=>{});loadGuideIndex().catch(()=>{});'));
+ assert.ok(js.includes("peekAccountTabData('/api/account/publicity')"));
+ assert.ok(js.includes("peekAccountTabData('/api/guides?view=index')"));
+ assert.ok(js.includes("if(existing?.epoch===epoch)return existing.promise"));
+ assert.ok(js.includes("sessionEpoch++;clearAccountTabData();"));
+ assert.ok(js.includes("invalidateAccountTabData('/api/invoices')"));
+ const warm=js.slice(js.indexOf('function warmAccountTabData'),js.indexOf('async function requestOverview'));
+ assert.doesNotMatch(warm,/\/api\/account\/key|receipt\.pdf|localStorage|sessionStorage/);
+ assert.match(css,/@container \(min-width:650px\)/);assert.match(css,/\.account-key-row \.account-key-top\{display:contents\}/);
+ assert.match(css,/max-width:220px/);assert.ok(js.includes('account-key-card account-key-row'));
+});
