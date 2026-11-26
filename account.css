@@ -205,3 +205,39 @@
 .account-keys-summary .client-quiet,.account-key-launcher{font-size:.75rem}
 .account-key-launcher{color:#b4c8e0;text-decoration:underline;text-underline-offset:3px}
 @media(max-width:760px){.account-keys-heading{flex-wrap:wrap;gap:8px}.account-keys-toolbar{margin-left:auto}.account-key-arrow{width:36px;height:44px}.account-page .account-keys-refresh{min-height:44px}.account-key-list-compact .account-key-card{padding:12px;gap:10px}.account-key-list-compact .account-key-field{grid-template-columns:minmax(0,1fr);gap:7px}.account-page .account-key-list-compact .portal-key-input{height:42px}.account-page .account-key-list-compact .portal-key-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}.account-page .account-key-list-compact .account-key-action{font-size:.73rem;min-height:44px;padding:6px 3px;white-space:normal}.account-key-list-compact .account-key-name small{font-size:.69rem}}
+
+/* Phone receipt: compact paper, accessible close and persistent download action.
+   Normal portrait phones fit without scrolling; short/zoomed viewports retain safe overflow. */
+@media(max-width:760px){
+ #modal.purchase-invoice-dialog{box-sizing:border-box;width:calc(100% - 20px);max-width:440px;max-height:calc(100dvh - 20px);padding:12px;overscroll-behavior:contain;overflow:auto}
+ #modal.purchase-invoice-dialog .modal-top{margin:0 0 8px;min-height:44px}
+ #modal.purchase-invoice-dialog .modal-top img{width:60px}
+ #modal.purchase-invoice-dialog #dialogTitle{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;margin:0}
+ .bro-invoice-paper{padding:13px;gap:11px;border-radius:8px}
+ .bro-invoice-banner{padding-bottom:10px;gap:8px}
+ .bro-invoice-banner>div{gap:3px}
+ .bro-invoice-brand strong{font-size:1.65rem}
+ .bro-invoice-banner>div:last-child strong{font-size:.7rem;line-height:1.25}
+ .bro-invoice-banner span{font-size:.64rem;line-height:1.3}
+ .bro-invoice-meta{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 12px}
+ .bro-invoice-meta>div:nth-child(2){grid-column:1/-1;grid-row:2}
+ .bro-invoice-meta>div{gap:3px}
+ .bro-invoice-meta span{font-size:.65rem}
+ .bro-invoice-meta strong{font-size:.73rem;line-height:1.3}
+ .bro-invoice-line{grid-template-columns:minmax(0,1fr) 25px minmax(60px,auto);padding:7px 5px;gap:5px;font-size:.72rem}
+ .bro-invoice-line-head{font-size:.66rem}
+ .bro-invoice-total{padding:10px 9px;font-size:.73rem}
+ .bro-invoice-total strong{font-size:1.03rem}
+ #modal .bro-invoice-disclaimer{font-size:.66rem;line-height:1.38}
+ .bro-invoice-actions{position:sticky;bottom:0;background:#192330;padding-top:8px;margin-top:4px}
+ .bro-invoice-actions .btn{min-height:44px;font-size:.79rem}
+}
+@media(max-width:760px) and (max-height:570px){
+ #modal.purchase-invoice-dialog{padding:8px}
+ #modal.purchase-invoice-dialog .modal-top{margin-bottom:4px}
+ .bro-invoice-paper{padding:9px;gap:7px}
+ .bro-invoice-banner{padding-bottom:6px}
+ .bro-invoice-meta{gap:5px 8px}
+ .bro-invoice-line{padding:5px 3px}
+ .bro-invoice-total{padding:7px}
+}

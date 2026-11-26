@@ -333,7 +333,7 @@ async function account(){
     const heading=block('div');heading.append(block('strong','JUSTIFICATIF D’ACHAT'),block('span',purchaseDate(record)));
     banner.append(brand,heading);paper.append(banner);
     const meta=block('div',undefined,'bro-invoice-meta');
-    for(const [label,value] of [['Compte client',user.username||user.discordUsername||'Compte BRO'],['Référence de transaction',record.reference],['Traitement du paiement',record.provider==='tebex'?'Tebex':record.provider==='whop'?'Whop':'Prestataire de paiement']]){
+    for(const [label,value] of [['Compte client',user.username||user.discordUsername||'Compte BRO'],['Référence BRO',record.reference],['Traitement du paiement',record.provider==='tebex'?'Tebex':record.provider==='whop'?'Whop':'Prestataire de paiement']]){
       const field=block('div');field.append(block('span',label),block('strong',value));meta.append(field);
     }
     paper.append(meta);
@@ -344,7 +344,7 @@ async function account(){
     const total=block('div',undefined,'bro-invoice-total');total.append(block('span','Montant de la transaction'),block('strong',purchaseAmount(record)));paper.append(total);
     paper.append(block('p','Ce document récapitule la transaction enregistrée sur BRO CLIENT. Il ne remplace pas la facture fiscale du vendeur légal. Le détail des taxes et les remboursements éventuels ne sont pas attestés par ce document.','bro-invoice-disclaimer'));
     const actions=block('div',undefined,'bro-invoice-actions');
-    const download=link('Télécharger le PDF','/api/invoices/'+encodeURIComponent(record.id)+'/receipt.pdf','btn client-button-primary');download.download='BRO-achat-'+record.id+'.pdf';
+    const download=link('Télécharger le PDF','/api/invoices/'+encodeURIComponent(record.id)+'/receipt.pdf','btn client-button-primary');download.download=record.reference+'.pdf';
     actions.append(download);bodyGlobal().append(paper,actions);
   }
   // The account body is local to account(); the shared dialog uses its own DOM node.
@@ -368,7 +368,7 @@ async function account(){
       for(const p of missing){
         const names={day:'Pass Jour',week:'Pass Semaine',month:'Pass Mois',life:'Pass Lifetime'};
         const row=block('div',undefined,'account-history-row');
-        const product=block('div',undefined,'account-history-product');product.append(block('strong',names[p.planId]||'Pass'),block('small',p.paymentId));
+        const product=block('div',undefined,'account-history-product');product.append(block('strong',names[p.planId]||'Pass'),block('small','Référence indisponible'));
         row.append(product,block('span','Non disponible','account-history-date'),block('span','—','account-history-amount'),block('span','Justificatif indisponible','account-history-missing'));target.append(row);
       }
       return;
@@ -383,7 +383,7 @@ async function account(){
           if(!r.ok)throw Error('history');
           const result=await r.json();if(!Array.isArray(result.invoices))throw Error('history');
           for(const record of result.invoices){
-            if(!/^pay_[A-Za-z0-9]+$/.test(record.id)||typeof record.title!=='string'||!Number.isFinite(Date.parse(record.date))||typeof record.amount!=='number'||!Number.isFinite(record.amount)||record.amount<0||!/^[A-Z]{3}$/.test(record.currency)||typeof record.reference!=='string')continue;
+            if(!/^pay_[A-Za-z0-9]+$/.test(record.id)||typeof record.title!=='string'||!Number.isFinite(Date.parse(record.date))||typeof record.amount!=='number'||!Number.isFinite(record.amount)||record.amount<0||!/^[A-Z]{3}$/.test(record.currency)||!/^bro-\d{24}$/.test(record.reference||''))continue;
             records.set(record.id,record);
           }
           cursor=result.nextCursor||null;if(cursor&&seen.has(cursor))throw Error('history_cursor');if(cursor)seen.add(cursor);
@@ -403,7 +403,7 @@ async function account(){
       const head=block('div',undefined,'account-section-head account-keys-heading');
       head.append(accountHeading('Mes clés','Retrouve les clés associées à tes achats.'));
       const controls=block('div',undefined,'account-keys-toolbar');
-      const refreshButton=smallButton('Actualiser',()=>refresh(true),'btn ghost account-keys-refresh');refreshButton.setAttribute('aria-label','Actualiser mes accès');
+      const refreshButton=smallButton('Actualiser mes accès',()=>refresh(true),'btn ghost account-keys-refresh');refreshButton.textContent='Actualiser';refreshButton.setAttribute('aria-label','Actualiser mes accès');
       controls.append(refreshButton);head.append(controls);viewport.append(head);
       if(!overview){const preview=block('div',undefined,'account-key-card account-skeleton-key');preview.setAttribute('aria-hidden','true');preview.append(block('div',undefined,'account-skeleton-bar'),block('div',undefined,'account-skeleton-bar'));viewport.append(preview);return;}
       const display={day:'Pass Jour',week:'Pass Semaine',month:'Pass Mois',life:'Pass Lifetime'};

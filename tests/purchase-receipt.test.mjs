@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {normalizePurchaseReceipt,purchaseReceiptPdf} from '../lib/purchase-receipt.mjs';
+import {normalizePurchaseReceipt,purchaseReceiptPdf,broPurchaseReference} from '../lib/purchase-receipt.mjs';
 import {handleBilling} from '../lib/billing.mjs';
 const raw={id:'pay_Test123',title:'Pass Semaine',date:'2026-11-26T12:42:00Z',amount:0,currency:'EUR',provider:'tebex',transactionId:'tbx-test-123'};
 test('receipt normalizes zero purchases and rejects fabricated amounts',()=>{
- const r=normalizePurchaseReceipt(raw);assert.equal(r.amount,0);assert.equal(r.reference,'tbx-test-123');
+ const r=normalizePurchaseReceipt(raw);assert.equal(r.amount,0);assert.equal(r.reference,broPurchaseReference(raw.id));assert.match(r.reference,/^bro-\d{24}$/);assert.equal(normalizePurchaseReceipt({...raw,transactionId:'tbx-other'}).reference,r.reference);assert.notEqual(broPurchaseReference('pay_Other'),r.reference);
  assert.equal(normalizePurchaseReceipt({...raw,amount:null}),null);assert.equal(normalizePurchaseReceipt({...raw,amount:-1}),null);assert.equal(normalizePurchaseReceipt(raw,'pay_Other'),null);
  const pdf=purchaseReceiptPdf(r,'Compte (test)');const s=pdf.toString('latin1');
- assert.match(s,/^%PDF-1\.4/);assert.match(s,/Justificatif d'achat/);assert.match(s,/0,00 EUR/);assert.match(s,/tbx-test-123/);
+ assert.match(s,/^%PDF-1\.4/);assert.match(s,/Justificatif d'achat/);assert.match(s,/0,00 EUR/);assert.ok(s.includes(r.reference));assert.doesNotMatch(s,/tbx-test-123/);
  const start=Number(s.match(/startxref\n(\d+)/)[1]);assert.equal(s.slice(start,start+4),'xref');
  const refs=s.slice(start).split('\n').slice(3,9);for(const [i,line] of refs.entries())assert.equal(s.slice(Number(line.slice(0,10)),Number(line.slice(0,10))+7),(i+1)+' 0 obj');
 });
@@ -24,5 +24,5 @@ test('receipt route requires the authenticated owner and serves a local PDF for 
  assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'application/pdf');assert.match(response.headers.get('cache-control'),/no-store/);
  assert.match(Buffer.from(await response.arrayBuffer()).toString('latin1'),/Number7/);
  assert.equal((await handleBilling(new Request('https://example.com/api/invoices/'+whop.id+'/receipt.pdf'),env,'auth-A')).status,200);
- const list=await (await handleBilling(new Request('https://example.com/api/invoices'),env,'auth-A')).json();assert.equal(list.invoices.length,2);assert.ok(list.invoices.some(x=>x.amount===0));assert.ok(list.invoices.every(x=>!('pdfUrl' in x)));
+ const list=await (await handleBilling(new Request('https://example.com/api/invoices'),env,'auth-A')).json();assert.equal(list.invoices.length,2);assert.ok(list.invoices.some(x=>x.amount===0));assert.ok(list.invoices.every(x=>!('pdfUrl' in x)&&/^bro-\d{24}$/.test(x.reference)));assert.doesNotMatch(JSON.stringify(list),/tbx-test-123|transactionId/);assert.equal(response.headers.get('content-disposition'),'attachment; filename="'+broPurchaseReference(raw.id)+'.pdf"');
 });
