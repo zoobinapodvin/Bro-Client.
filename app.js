@@ -299,15 +299,16 @@ async function account(){
     if(guideIndex){
       target.replaceChildren();
       if(!guideIndex.length){target.append(block('p','Aucun guide publié pour le moment.','client-quiet'));return;}
-      const grid=block('div',undefined,'account-guides-grid');
-      for(const [i,g] of guideIndex.entries()){
+      const list=block('ul',undefined,'account-guides-list');
+      for(const g of guideIndex){
         if(!/^[a-f0-9]{24}$/.test(g.id)||typeof g.title!=='string')continue;
-        const card=link('', '/guides?guide='+encodeURIComponent(g.id),'account-guide-card');
-        const top=block('div',undefined,'account-guide-top'),icon=block('span',undefined,'account-guide-icon');icon.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5a2 2 0 0 1 2-2h14v18H6a2 2 0 0 1 0-4h14"/><path d="M8 7h8M8 11h5"/></svg>';
-        top.append(icon,block('span','GUIDE '+String(i+1).padStart(2,'0'),'account-guide-number'));
-        card.append(top,block('h3',g.title),block('span','Lire le guide  →','account-guide-cta'));grid.append(card);
+        const row=block('li',undefined,'account-guide-row');
+        const title=block('span',g.title,'account-guide-title');
+        const action=link('Lire', '/guides?guide='+encodeURIComponent(g.id),'account-guide-link');
+        action.setAttribute('aria-label','Lire le guide : '+g.title);
+        row.append(title,action);list.append(row);
       }
-      target.append(grid);return;
+      target.append(list);return;
     }
     target.replaceChildren(block('p','Récupération des guides…','client-quiet'));
     if(!guideRequest){
