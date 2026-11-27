@@ -15,3 +15,6 @@ await cp('guides.css','dist/guides.css');
 
 // Seed the owner's explicitly declared operational state once; subsequent deployments preserve it.
 if(process.env.VERCEL_ENV==='production'){const {bucket}=await import('./lib/storage.mjs');const {initializeManualStatus}=await import('./lib/service-status.mjs');const result=await initializeManualStatus(bucket);console.info('BRO manual status initialization',JSON.stringify({state:result.state,discord:result.discord,already:result.already,busy:result.busy}));}
+
+// Refresh the existing Discord message on this production release without changing the declared status.
+if(process.env.VERCEL_ENV==='production'){try{const {bucket}=await import('./lib/storage.mjs');const {syncServiceStatus}=await import('./lib/service-status.mjs');const r=await syncServiceStatus(bucket);console.info('BRO Discord legend removal refresh',JSON.stringify({discord:r.discord,state:r.state,busy:r.busy}));}catch(error){console.warn('BRO Discord refresh deferred',error?.name);}}
