@@ -26,3 +26,15 @@ test('receipt route requires the authenticated owner and serves a local PDF for 
  assert.equal((await handleBilling(new Request('https://example.com/api/invoices/'+whop.id+'/receipt.pdf'),env,'auth-A')).status,200);
  const list=await (await handleBilling(new Request('https://example.com/api/invoices'),env,'auth-A')).json();assert.equal(list.invoices.length,2);assert.ok(list.invoices.some(x=>x.amount===0));assert.ok(list.invoices.every(x=>!('pdfUrl' in x)&&/^bro-\d{24}$/.test(x.reference)));assert.doesNotMatch(JSON.stringify(list),/tbx-test-123|transactionId/);assert.equal(response.headers.get('content-disposition'),'attachment; filename="'+broPurchaseReference(raw.id)+'.pdf"');
 });
+
+test('revoked duplicate receipt remains private and is omitted from customer history and PDF',async()=>{
+ const owner=createHash('sha256').update('auth-A').digest('hex'),prefix='private/invoices/'+owner+'/';
+ const first={...raw,id:'pay_First'},second={...raw,id:'pay_Second',revokedAt:'2026-11-27T02:00:00Z'};
+ const data=new Map([[prefix+first.id,first],[prefix+second.id,second]]);
+ const bucket={get:async key=>data.has(key)?{json:async()=>data.get(key)}:null,list:async({prefix})=>({objects:[...data.keys()].filter(k=>k.startsWith(prefix)).map(key=>({key})),truncated:false})};
+ const env={BUCKET:bucket};const list=await (await handleBilling(new Request('https://example.com/api/invoices'),env,'auth-A')).json();
+ assert.deepEqual(list.invoices.map(i=>i.id),[first.id]);
+ assert.equal((await handleBilling(new Request('https://example.com/api/invoices/'+second.id+'/receipt.pdf'),env,'auth-A')).status,404);
+ assert.equal((await handleBilling(new Request('https://example.com/api/invoices/'+first.id+'/receipt.pdf'),env,'auth-A')).status,200);
+ assert.equal(data.get(prefix+second.id),second);
+});
