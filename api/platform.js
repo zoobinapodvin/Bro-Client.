@@ -1,4 +1,5 @@
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
+import {readPublicStatus,syncServiceStatus} from '../lib/service-status.mjs';
 import {isIP} from 'node:net';
 import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
@@ -85,6 +86,8 @@ export default async function handler(req,res) {
     if(req.method==='POST'&&!isWebhook&&!isInteraction &&
        !(isDiscordStart&&trustedLoginOrigin) && req.headers.origin!==origin)
       return res.status(403).json({error:'Origine de la requête non autorisée.'});
+    if(path==='/api/status'&&req.method==='GET'){res.setHeader('Cache-Control','public, s-maxage=15, max-age=0');return res.json(await readPublicStatus(bucket));}
+    if(path==='/api/status/cron'&&req.method==='GET'){const secret=process.env.CRON_SECRET;if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();const result=await syncServiceStatus(bucket);console.info('BRO status sync',result);return res.json(result);}
     const site=()=>readSite(bucket);
     if(path==='/api/discord/community'&&req.method==='GET'){
       const counts=await communityStats();
