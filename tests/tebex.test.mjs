@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {completeTebexPayment,verifyTebexBasket,recoverConfiguredTebexPayment,fetchTebexPayment,retryTebexPublicNotices} from '../lib/tebex.mjs';
-import {addStockKey,readCustomerKey,stockOverview} from '../lib/fulfillment.mjs';
+import {addStockKey,readCustomerKey,stockOverview,revokeDuplicateComplimentaryPurchase} from '../lib/fulfillment.mjs';
 import {recentPurchases,storeActivity} from '../lib/activity.mjs';
 const discordId='1574096900000000001',owner='a'.repeat(64),ref='01234567-1234-1234-1234-0123456789ab',ownerId='1027596385123565569';
 const bucket=()=>{const m=new Map();let version=0;return {m,async get(k){const x=m.get(k);return x?{etag:x.etag,json:async()=>structuredClone(x.data)}:null;},async head(k){const x=m.get(k);return x?{etag:x.etag}:null;},async put(k,v,o={}){const old=m.get(k);if(o.onlyIf?.etagDoesNotMatch==='*'&&old||o.onlyIf?.etagMatches&&o.onlyIf.etagMatches!==old?.etag)return null;const etag=String(++version);m.set(k,{data:JSON.parse(v),etag});return {etag};},async list({prefix}){return {objects:[...m.keys()].filter(k=>k.startsWith(prefix)).map(key=>({key})),truncated:false};}};};
@@ -124,4 +124,30 @@ test('Discord public 404 never rejects two distinct purchases by the same accoun
  assert.equal(announcements,2);assert.equal((await stockOverview(b)).counts.day.assigned,2);
  const rejected=eventFor('day','tbx-unverified-new');rejected.subject.status.id=0;
  assert.equal((await completeTebexPayment(b,rejected,deps)).status,422);
+});
+
+test('owner can withdraw only a verified second complimentary purchase, retaining the first and quarantining the exposed key',async t=>{
+ const old=process.env.BRO_KEY_ENCRYPTION_KEY,pause=process.env.BRO_KEY_DELIVERY_PAUSED;
+ process.env.BRO_KEY_ENCRYPTION_KEY='4'.repeat(64);process.env.BRO_KEY_DELIVERY_PAUSED='false';
+ t.after(()=>{if(old===undefined)delete process.env.BRO_KEY_ENCRYPTION_KEY;else process.env.BRO_KEY_ENCRYPTION_KEY=old;if(pause===undefined)delete process.env.BRO_KEY_DELIVERY_PAUSED;else process.env.BRO_KEY_DELIVERY_PAUSED=pause;});
+ const b=bucket(),secondRef='01234567-1234-1234-1234-0123456789ac';
+ await setup(b,'week');const original=await (await b.get('private/tebex/orders/'+ref+'.json')).json();
+ await b.put('private/tebex/orders/'+secondRef+'.json',JSON.stringify(original));
+ for(const key of ['FIRST-FREE-KEY','SECOND-FREE-KEY','SPARE-KEY'])await addStockKey(b,{planId:'week',key,operatorId:ownerId});
+ const first=eventFor('week','tbx-complimentary-first'),second=eventFor('week','tbx-complimentary-second');
+ first.subject.price.amount=0;second.subject.price.amount=0;second.subject.custom.bro_order=secondRef;second.subject.created_at=new Date(Date.parse(first.subject.created_at)+1000).toISOString();
+ const deps={verifyBasket:async()=>({currency:'EUR',total_price:0}),reconcile:async()=>({status:'role_granted'}),notify:async()=>({ok:true}),publicNotify:async()=>({ok:true,configured:true})};
+ for(const e of [first,second])assert.equal((await completeTebexPayment(b,e,deps)).status,200);
+ const rows=(await stockOverview(b)).rows.filter(r=>r.paymentId);
+ const target=rows.find(r=>r.paymentId&&r.id&&b.m.get('private/tebex/payments/'+r.paymentId+'.json')?.data.transactionId===second.subject.transaction_id);
+ const keep=rows.find(r=>r!==target);
+ const input={operatorId:ownerId,keyId:target.id,paymentId:target.paymentId,firstTransaction:first.subject.transaction_id};
+ assert.equal((await revokeDuplicateComplimentaryPurchase(b,{...input,operatorId:discordId})).status,'invalid');
+ assert.equal((await revokeDuplicateComplimentaryPurchase(b,{...input,keyId:keep.id})).status,'not_verified_duplicate');
+ assert.equal((await revokeDuplicateComplimentaryPurchase(b,input)).status,'quarantined');
+ assert.equal((await revokeDuplicateComplimentaryPurchase(b,input)).status,'quarantined');
+ assert.equal(await readCustomerKey(b,discordId,target.paymentId),null);
+ assert.equal(await readCustomerKey(b,discordId,keep.paymentId),'FIRST-FREE-KEY');
+ assert.equal((await completeTebexPayment(b,second,deps)).body.delivery,'revoked');
+ const stock=await stockOverview(b);assert.equal(stock.counts.week.available,1);assert.equal(stock.counts.week.assigned,1);assert.equal(stock.rows.find(r=>r.id===target.id).status,'quarantine');
 });
