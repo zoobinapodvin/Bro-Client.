@@ -1,5 +1,5 @@
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
-import {readPublicStatus,syncServiceStatus} from '../lib/service-status.mjs';
+import {readPublicStatus,syncServiceStatus,canManageStatus,setManualStatus} from '../lib/service-status.mjs';
 import {isIP} from 'node:net';
 import {bucket} from '../lib/storage.mjs';
 import {readSite,saveSite,upload} from '../lib/store.mjs';
@@ -86,7 +86,7 @@ export default async function handler(req,res) {
     if(req.method==='POST'&&!isWebhook&&!isInteraction &&
        !(isDiscordStart&&trustedLoginOrigin) && req.headers.origin!==origin)
       return res.status(403).json({error:'Origine de la requête non autorisée.'});
-    if(path==='/api/status'&&req.method==='GET'){res.setHeader('Cache-Control','public, s-maxage=15, max-age=0');return res.json(await readPublicStatus(bucket));}
+    if(path==='/api/status'&&req.method==='GET'){res.setHeader('Cache-Control','no-store');return res.json(await readPublicStatus(bucket));}
     if(path==='/api/status/cron'&&req.method==='GET'){const secret=process.env.CRON_SECRET;if(!secret||req.headers.authorization!=='Bearer '+secret)return res.status(401).end();const result=await syncServiceStatus(bucket);console.info('BRO status sync',result);return res.json(result);}
     const site=()=>readSite(bucket);
     if(path==='/api/discord/community'&&req.method==='GET'){
@@ -155,6 +155,18 @@ export default async function handler(req,res) {
       res.setHeader('Content-Type',img.httpMetadata.contentType);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.end(Buffer.from(await new Response(img.body).arrayBuffer()));
     }
     const user=isWebhook?null:await session(req,res);
+    if(path==='/api/status/manage'){
+      if(!canManageStatus(user))return res.status(404).end();
+      if(req.method==='GET')return res.json({canManage:true,data:await readPublicStatus(bucket)});
+      if(req.method!=='POST')return res.status(405).end();
+      if(!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type']||''))return res.status(415).end();
+      let input;try{input=JSON.parse(payload.toString());}catch{return res.status(400).end();}
+      const result=await setManualStatus(bucket,user,input);
+      if(result.busy)return res.status(409).json({error:'busy'});
+      if(result.invalid)return res.status(422).json({error:'invalid_status'});
+      if(result.forbidden)return res.status(404).end();
+      return res.json(result);
+    }
     if((path==='/api/homepage'||path==='/api/homepage/media')&&req.method==='POST'){
       if(!canEditHomepage(user))return res.status(403).json({error:'Accès propriétaire requis.'});
       if(path.endsWith('/media'))return await respond(res,await upload(new Request(new URL(path,origin),{method:'POST',headers:req.headers,body:payload}),bucket));

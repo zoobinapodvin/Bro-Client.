@@ -12,5 +12,6 @@ for(const path of ['index.html','offres.html','espace-client.html','account.css'
 // The old static installation pages are retired. No guide HTML is shipped in dist.
 await cp('guides.css','dist/guides.css');
 
-// Initialize the dedicated public status message once; cron refreshes it afterwards.
-if(process.env.VERCEL_ENV==='production'){try{const {bucket}=await import('./lib/storage.mjs');const {syncServiceStatus}=await import('./lib/service-status.mjs');if(!await bucket.head('private/service-status/rob-run-v1.json'))console.info('BRO initial status sync',await syncServiceStatus(bucket));}catch(error){console.warn('BRO initial status deferred',error?.name);}}
+
+// Seed the owner's explicitly declared operational state once; subsequent deployments preserve it.
+if(process.env.VERCEL_ENV==='production'){const {bucket}=await import('./lib/storage.mjs');const {initializeManualStatus}=await import('./lib/service-status.mjs');const result=await initializeManualStatus(bucket);console.info('BRO manual status initialization',JSON.stringify({state:result.state,discord:result.discord,already:result.already,busy:result.busy}));}
