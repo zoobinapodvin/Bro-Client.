@@ -16,16 +16,3 @@ await cp('guides.css','dist/guides.css');
 // Seed the owner's explicitly declared operational state once; subsequent deployments preserve it.
 if(process.env.VERCEL_ENV==='production'){const {bucket}=await import('./lib/storage.mjs');const {initializeManualStatus}=await import('./lib/service-status.mjs');const result=await initializeManualStatus(bucket);console.info('BRO manual status initialization',JSON.stringify({state:result.state,discord:result.discord,already:result.already,busy:result.busy}));}
 
-// Apply the official BRO avatar to the webhook profile once for this visual upgrade.
-if(process.env.VERCEL_ENV==='production'){
- try{
-  const {readFile}=await import('node:fs/promises');
-  const {bucket}=await import('./lib/storage.mjs');
-  const {updateStatusWebhookProfile,syncServiceStatus,ensureStatusMessageAvatar}=await import('./lib/service-status.mjs');
-  const profile=await updateStatusWebhookProfile(await readFile('assets/bro-192.png'));
-  const result=await syncServiceStatus(bucket);
-  const avatarCheck=profile.ok?await ensureStatusMessageAvatar(bucket,profile.avatar):{ok:false};
-  console.info('BRO existing Discord avatar check',JSON.stringify(avatarCheck));
-  console.info('BRO multi-service Discord upgrade',JSON.stringify({avatar:profile.ok,avatarHttp:profile.status,discord:result.discord,busy:result.busy,state:result.state,existingMessageAvatar:typeof result.authorAvatar==='string'&&result.authorAvatar.length>0,avatarMatches:!!profile.avatar&&profile.avatar===result.authorAvatar}));
- }catch(error){console.warn('BRO Discord upgrade deferred',error?.name);}
-}
