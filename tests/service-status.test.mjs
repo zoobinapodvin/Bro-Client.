@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
-import {canManageStatus,publicStatus,statusPng,discordPayload,setManualStatus,initializeManualStatus,syncServiceStatus,statusServices,updateStatusWebhookProfile} from '../lib/service-status.mjs';
+import {canManageStatus,publicStatus,statusPng,discordPayload,setManualStatus,initializeManualStatus,syncServiceStatus,statusServices,updateStatusWebhookProfile,ensureStatusMessageAvatar} from '../lib/service-status.mjs';
 const owner={discordId:'1027596385123565569'},other={discordId:'123456789012345678',admin:true};
 function bucket(){const m=new Map();let n=0;return {get:async p=>m.has(p)?{etag:m.get(p).etag,json:async()=>JSON.parse(m.get(p).v)}:null,put:async(p,v,o={})=>{const c=o.onlyIf,prev=m.get(p);if(c?.etagDoesNotMatch==='*'&&prev||c?.etagMatches&&prev?.etag!==c.etagMatches)return null;const etag=String(++n);m.set(p,{v,etag});return {etag};}};}
 test('only verified owner Discord id can change status, even if another account is admin',async()=>{assert.equal(canManageStatus(owner),true);assert.equal(canManageStatus(other),false);assert.equal(canManageStatus(null),false);const b=bucket();assert.deepEqual(await setManualStatus(b,other,{state:'available',note:''}),{forbidden:true});assert.deepEqual(await setManualStatus(b,owner,{state:'invalid',note:''}),{invalid:true});});
@@ -13,3 +13,17 @@ test('status page does not repeat the purchase information block from offers',()
 
 test('status embed supports independent real services with a single branded message and separate timelines',()=>{const now=Date.parse('2026-11-28T03:00:00Z'),at=new Date(now-3600000).toISOString();const record={mode:'manual',state:'available',changedAt:at,changes:[{at,state:'available'}],services:{next:{mode:'manual',state:'maintenance',changedAt:at,changes:[{at,state:'maintenance'}]}}};const services=statusServices(record,now,[{id:'rob-run',name:'Client Rob Run'},{id:'next',name:'Service exemple'}]);const payload=discordPayload(services);assert.equal(payload.embeds.length,2);assert.match(payload.embeds[0].description,/1\/2 services opérationnels/);assert.match(payload.embeds[1].description,/Maintenance/);assert.equal(payload.embeds[1].image.url,'attachment://bro-status-next.png');assert.equal(payload.attachments.length,2);assert.equal(payload.embeds[0].thumbnail,undefined);assert.equal(payload.embeds[1].title,undefined);assert.deepEqual(payload.embeds[0].fields,[]);assert.equal(services[0].state,'available');assert.equal(services[1].state,'maintenance');});
 test('webhook avatar is set on the profile, not a message edit',async t=>{const old=process.env.BRO_STATUS_DISCORD_WEBHOOK;process.env.BRO_STATUS_DISCORD_WEBHOOK='https://discord.com/api/webhooks/123456789012345678/test-token';t.after(()=>{if(old===undefined)delete process.env.BRO_STATUS_DISCORD_WEBHOOK;else process.env.BRO_STATUS_DISCORD_WEBHOOK=old;});const r=await updateStatusWebhookProfile(statusPng({hours:Array(24).fill('unknown')}),{fetcher:async(url,opts)=>{assert.equal(url,process.env.BRO_STATUS_DISCORD_WEBHOOK);assert.equal(opts.method,'PATCH');const body=JSON.parse(opts.body);assert.equal(body.name,'BRO - Status');assert.match(body.avatar,/^data:image\/png;base64,/);return new Response(JSON.stringify({avatar:'avatar-hash'}));}});assert.equal(r.ok,true);});
+
+test('old default-avatar panel is replaced only after checking the new official avatar, preserving status and message identity thereafter',async t=>{
+ const old=process.env.BRO_STATUS_DISCORD_WEBHOOK;const hook='https://discord.com/api/webhooks/123456789012345678/test-token';process.env.BRO_STATUS_DISCORD_WEBHOOK=hook;
+ t.after(()=>{if(old===undefined)delete process.env.BRO_STATUS_DISCORD_WEBHOOK;else process.env.BRO_STATUS_DISCORD_WEBHOOK=old;});
+ const b=bucket(),before='123456789012345679',after='123456789012345680',messages=new Map(),calls=[];
+ const fetcher=async(url,opts)=>{calls.push(opts.method);
+  if(opts.method==='POST'){const id=messages.size?after:before;messages.set(id,{id,webhook_id:'123456789012345678',author:{avatar:id===before?null:'official-hash'}});return new Response(JSON.stringify(messages.get(id)));}
+  const id=url.split('/').at(-1);
+  if(opts.method==='DELETE'){messages.delete(id);return new Response(null,{status:204});}
+  if(opts.method==='GET')return new Response(JSON.stringify(messages.get(id)),{status:messages.has(id)?200:404});
+  return new Response(JSON.stringify(messages.get(id)));
+ };
+ await initializeManualStatus(b,{fetcher});assert.equal((await ensureStatusMessageAvatar(b,'official-hash',{fetcher})).replaced,true);assert.equal(messages.size,1);assert.equal(messages.has(before),false);assert.equal(messages.has(after),true);assert.equal((await ensureStatusMessageAvatar(b,'official-hash',{fetcher})).replaced,false);assert.equal((await syncServiceStatus(b,{fetcher})).state,'available');assert.equal(calls.filter(x=>x==='POST').length,2);
+});
